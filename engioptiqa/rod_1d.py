@@ -47,7 +47,7 @@ class Rod1D:
         for i_comp in range(self.n_comp):
             length = self.x[i_comp+1] - self.x[i_comp]
             width = self.cross_sections[i_comp]
-            ax.rod(0, length, width=width, bottom=bottom, align='center', label=str(i_comp),edgecolor='black', facecolor='gray')
+            ax.bar(0, length, width=width, bottom=bottom, align='center', label=str(i_comp),edgecolor='black', facecolor='gray')
             bottom += length
 
     # ax.set_xlabel('Composite Bar')
