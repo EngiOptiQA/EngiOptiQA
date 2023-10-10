@@ -9,6 +9,7 @@ import pickle
 from prettytable import PrettyTable
 from scipy.integrate import quad
 import sympy as sp
+import sys
 
 from .rod_1d import Rod1D
 from .real_number import RealNumber
@@ -376,11 +377,13 @@ class BaseProblem:
         file_name = os.path.join(self.output_path, self.name.lower().replace(' ', '_') + '_QUBO_pattern' + suffix)
         plt.savefig(file_name, dpi=600)
         
-    def analyze_results(self, analysis_plots=True):
+    def analyze_results(self, analysis_plots=True, result_max=sys.maxsize):
 
         if hasattr(self, 'results'):
             self.errors_force_rel = [np.Inf for _ in range(len(self.results))]
             for i_result, result in enumerate(self.results):
+                if i_result > result_max:
+                    break
                 #print('Solution ' + str(i_result))
                 output = f'Solution {i_result}\n'
                 #print(f"\tenergy = {result.energy}, frequency = {result.frequency}")
@@ -407,7 +410,7 @@ class BaseProblem:
                         file_name_stress = None
                         file_name_rod = None
                     self.plot_force(self.force_analytic, force_sol, file_name_force, self.save_fig) 
-                    self.plot_stress(self.stress_analytic, stress_sol, file_name_stress, self.save_fig) 
+                    self.plot_stress(self.stress_analytic, stress_sol, file_name_stress, self.save_fig)
                     rod_tmp = Rod1D(self.rod.n_comp, self.rod.L, 0.0)
                     rod_tmp.set_cross_sections_from_inverse(cs_inv_sol)
                     rod_tmp.visualize(file_name_rod, self.save_fig)
