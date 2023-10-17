@@ -1,6 +1,8 @@
-from .annealing_solver import AnnealingSolver
+from .annealing_solver import AnnealingSolverAmplify, AnnealingSolverDWave
 from .rod_1d import Rod1D
-from .design_optimization_problem import DesignOptimizationProblem
+from .design_optimization_problem_amplify import DesignOptimizationProblemAmplify
+from .design_optimization_problem_dwave import DesignOptimizationProblemDWave
 from .real_number import RealNumber
 from .solution_emulator import SolutionEmulator
-from .structural_analysis_problem import StructuralAnalysisProblem
+from .structural_analysis_problem_amplify import StructuralAnalysisProblemAmplify
+from .structural_analysis_problem_dwave import StructuralAnalysisProblemDWave
