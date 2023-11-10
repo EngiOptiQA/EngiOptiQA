@@ -130,9 +130,9 @@ class AnnealingSolverDWave(AnnealingSolver):
             **kwargs
         )
         print('Number of solutions:', len(problem.results_indices))
-        if hasattr(problem, 'label_mapping_inverse'):
+        if hasattr(problem, 'mapping_i_to_q'):
             problem.results =  problem.results_indices.relabel_variables(
-                problem.label_mapping_inverse,
+                problem.mapping_i_to_q,
                 inplace=False)
             #problem.binary_quadratic_model.relabel_variables(problem.label_mapping_inverse,inplace=True)
         else:
@@ -146,8 +146,12 @@ class AnnealingSolverDWave(AnnealingSolver):
                 problem.binary_quadratic_model_indices,
                 initial_states=problem.results_indices
                 ) 
-            problem.results_pp = sampleset_pp.relabel_variables(
-                problem.label_mapping_inverse,
-                inplace=False)
+            if hasattr(problem, 'mapping_i_to_q'):
+                problem.results_pp = sampleset_pp.relabel_variables(
+                    problem.mapping_i_to_q,
+                    inplace=False)
+            else:
+                problem.results_pp = sampleset_pp
+            
         else:
             raise Exception('Trying to perform local search altough no results exist yet.')

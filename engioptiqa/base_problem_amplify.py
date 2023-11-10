@@ -147,13 +147,17 @@ class BaseProblemAmplify(BaseProblem):
 
     def transform_to_dwave(self, lp_file_path):
         save_lp(self.binary_quadratic_model, lp_file_path)
-        print(self.binary_quadratic_model.logical_poly)
         # Import as DWave constrained quadratic model (CQM)
         cqm = lp.load(lp_file_path)
         # Transform to DWave BQM
         bqm = cqm_to_bqm(cqm)
         # Set BQM problem that is solved by AnnealingSolverDWave
         self.binary_quadratic_model_indices = BinaryQuadraticModelDWave(bqm[0])
+
+        mapping_x_to_i = {}
+        for i_var in range(self.binary_quadratic_model_indices.num_variables):  
+            mapping_x_to_i.update({f'x_{i_var}': i_var})
+        self.binary_quadratic_model_indices.relabel_variables(mapping_x_to_i, inplace=True)
 
     def decode_nodal_force_solution(self, result):
         nf_sol = []
