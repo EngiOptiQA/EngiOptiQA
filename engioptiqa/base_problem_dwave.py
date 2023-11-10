@@ -1,5 +1,6 @@
 from matplotlib import pyplot as plt
 import numpy as np
+import os
 from pyqubo import Array, Base
 
 from .base_problem import BaseProblem
@@ -21,6 +22,18 @@ class BaseProblemDWave(BaseProblem):
 
         self.nf_polys = nf_polys      
 
+    def update_penalty_weight_in_qubo_formulation(self, penalty_weight = 1.0):
+        self.penalty_weight_equilibrium = penalty_weight
+        self.poly = self.complementary_energy_poly + \
+             self.penalty_weight_equilibrium * self.equilibrium_constraint_poly
+        self.pyqubo_model = self.poly.compile()
+        self.binary_quadratic_model = self.pyqubo_model.to_bqm()
+        if self.label_mapping is not None:
+            self.binary_quadratic_model_indices = self.binary_quadratic_model.relabel_variables(
+                self.label_mapping,inplace=False)
+        else:
+            raise Exception('Cannot update QUBO formulation without label mapping.')
+
     def generate_qubo_formulation(self, penalty_weight = 1.0):
 
         self.generate_complementary_energy_poly()
@@ -28,12 +41,18 @@ class BaseProblemDWave(BaseProblem):
 
         self.penalty_weight_equilibrium = penalty_weight
 
+        self.bqm_objective = self.complementary_energy_poly.compile().to_bqm()
+        self.bqm_constraints = self.equilibrium_constraint_poly.compile().to_bqm() 
+
         self.poly = self.complementary_energy_poly + \
              self.penalty_weight_equilibrium * self.equilibrium_constraint_poly
+        
+        # Only constraints:
+        #self.poly = self.equilibrium_constraint_poly
         # print(model.to_qubo())
 
-        self.binary_quadratic_model = self.poly.compile().to_bqm()
-        print(self.binary_quadratic_model)
+        #self.binary_quadratic_model = self.poly.compile().to_bqm()
+        #print(self.binary_quadratic_model)
         
         # For the BQM, replace qubit names q[i][j] by indices 0,1,...
         self.label_mapping = {}
@@ -57,19 +76,20 @@ class BaseProblemDWave(BaseProblem):
         self.label_mapping.update(label_mapping_cs_inv)
         self.label_mapping_inverse.update(label_mapping_cs_inv_inverse)
 
-        print(self.label_mapping)
-        print(self.poly)
+        # print(self.label_mapping)
+        #print(self.poly)
         self.pyqubo_model = self.poly.compile()
-        print(self.pyqubo_model)
+        #print(self.pyqubo_model)
         self.binary_quadratic_model = self.pyqubo_model.to_bqm()
+        # print(f'offset: {self.binary_quadratic_model.offset}')
+        # self.binary_quadratic_model.offset = 0.0
+        # print(f'offset: {self.binary_quadratic_model.offset}')
         self.binary_quadratic_model_indices = self.binary_quadratic_model.relabel_variables(self.label_mapping,inplace=False)
-        print("Original model:", self.binary_quadratic_model)
-        print("Model with indices:", self.binary_quadratic_model_indices)
+        # print("Original model:", self.binary_quadratic_model)
+        # print("Model with indices:", self.binary_quadratic_model_indices)
 
     def visualize_qubo_matrix(self, show_fig=False, save_fig=False, suffix=''):
         
-        
-
         title = self.name + '\n QUBO Matrix (PI + Manual Penalty) \n'
         # if hasattr(self, 'quad_method_name'):
             # title += self.quad_method_name
@@ -126,6 +146,12 @@ class BaseProblemDWave(BaseProblem):
                 print(type(cs_inv_poly))
                 raise Exception('Unexpected type for cs_inv_poly')   
         return cs_inv_sol
+    
+    def get_energy(self, index):
+        return self.results.record[index]['energy']
+    
+    def get_frequency(self, index):
+        return self.results.record[index]['num_occurrences']
     
     def store_results(self):
         raise Exception('store_results not yet implemented for BaseProblemDWave')

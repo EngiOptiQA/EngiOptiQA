@@ -1,8 +1,16 @@
 from amplify import (
     BinaryPoly, 
     BinaryQuadraticModel,
+    save_lp,
     SymbolGenerator)
+
+from dimod import BinaryQuadraticModel as BinaryQuadraticModelDWave
+from dimod import cqm_to_bqm, lp
+from dimod.views.samples import SampleView
+from dimod.sampleset import SampleSet
+
 from matplotlib import pyplot as plt
+import matplotlib.patches as patches
 import numpy as np
 import os
 import pickle
@@ -52,8 +60,12 @@ class BaseProblemAmplify(BaseProblem):
         con_eq_max = np.max(con_eq_abs)
         #print("Magnitude Constraint EQ", con_eq_max)
 
+        # TODO Scaling
+        # Options for penalty weight:
+        # 1. Scale
         self.penalty_weight_equilibrium = PI_max/con_eq_max * penalty_weight
-        # self.penalty_weight_equilibrium = penalty_weight
+        # 2. Do not scale
+        self.penalty_weight_equilibrium = penalty_weight
 
         self.poly = self.complementary_energy_poly + \
             self.penalty_weight_equilibrium * self.equilibrium_constraint_poly
@@ -71,7 +83,15 @@ class BaseProblemAmplify(BaseProblem):
         output+= f'Number of logical qubits: {self.binary_quadratic_model.num_logical_vars}\n'
         self.print_and_log(output)
 
-
+    def update_penalty_weight_in_qubo_formulation(self, penalty_weight = 1.0):
+        self.penalty_weight_equilibrium = penalty_weight
+        self.poly = self.complementary_energy_poly + \
+            self.penalty_weight_equilibrium * self.equilibrium_constraint_poly
+        if self.quad_method is not None:
+            self.binary_quadratic_model = BinaryQuadraticModel(self.poly, method=self.quad_method)
+        else:
+            self.binary_quadratic_model = BinaryQuadraticModel(self.poly)
+        
     def visualize_qubo_matrix(self, show_fig=False, save_fig=False, suffix=''):
         title = self.name + '\n QUBO Matrix (PI + Manual Penalty) \n'
         # if hasattr(self, 'quad_method_name'):
@@ -90,20 +110,59 @@ class BaseProblemAmplify(BaseProblem):
             plt.savefig(file_name, dpi=600)
         plt.close()
 
-    def plot_qubo_matrix_pattern(self):
-        title = self.name + '\n QUBO Pattern (PI + Manual Penalty) \n'
-        # if hasattr(self, 'quad_method_name'):
-            # title += self.quad_method_name
+    def plot_qubo_matrix_pattern(self, highlight_nodes=False, highlight_interactions=False):
+        title = self.name + '\n QUBO Pattern \n'
         binary_matrix = np.where(self.qubo_matrix.to_numpy() != 0, 1, 0)
         plt.figure()
         plt.suptitle(title)
         plt.imshow(binary_matrix,cmap='gray_r')
 
+        if highlight_nodes:
+            for i_node in range(self.rod.n_comp):
+                x_pos = (i_node)*self.n_qubits_per_node - 0.5
+                y_pos = x_pos
+                rect = patches.Rectangle(
+                    (x_pos,y_pos), 
+                    self.n_qubits_per_node, 
+                    self.n_qubits_per_node,
+                    linewidth = 2,
+                    edgecolor='red', 
+                    facecolor='none'
+                )
+                plt.gca().add_patch(rect)
+
+        if highlight_interactions:
+            for i_node in range(self.rod.n_comp-1):
+                x_pos = (i_node)*self.n_qubits_per_node - 0.5
+                y_pos = x_pos
+                rect = patches.Rectangle(
+                    (x_pos,y_pos), 
+                    2*self.n_qubits_per_node, 
+                    2*self.n_qubits_per_node,
+                    linewidth = 2,
+                    edgecolor='orange', 
+                    facecolor='none'
+                )
+                plt.gca().add_patch(rect)        
+
+    def transform_to_dwave(self, lp_file_path):
+        save_lp(self.binary_quadratic_model, lp_file_path)
+        print(self.binary_quadratic_model.logical_poly)
+        # Import as DWave constrained quadratic model (CQM)
+        cqm = lp.load(lp_file_path)
+        # Transform to DWave BQM
+        bqm = cqm_to_bqm(cqm)
+        # Set BQM problem that is solved by AnnealingSolverDWave
+        self.binary_quadratic_model_indices = BinaryQuadraticModelDWave(bqm[0])
+
     def decode_nodal_force_solution(self, result):
         nf_sol = []
         for nf_poly in self.nf_polys:
             if type(nf_poly) is BinaryPoly:
-                nf_sol.append(nf_poly.decode(result.values))
+                if type(result) is SampleView:
+                    nf_sol.append(nf_poly.decode(result))
+                else:
+                    nf_sol.append(nf_poly.decode(result.values))
             elif type(nf_poly) in [float, np.float64]:
                 nf_sol.append(nf_poly)
             else:
@@ -116,7 +175,10 @@ class BaseProblemAmplify(BaseProblem):
         cs_inv_sol = []       
         for cs_inv_poly in self.cs_inv_polys:
             if type(cs_inv_poly) is BinaryPoly:
-                cs_inv_sol.append(cs_inv_poly.decode(result.values))   
+                if type(result) is SampleView:
+                    cs_inv_sol.append(cs_inv_poly.decode(result))
+                else:
+                    cs_inv_sol.append(cs_inv_poly.decode(result.values))   
             elif type(cs_inv_poly) in [float, np.float64]:
                 cs_inv_sol.append(cs_inv_poly)
             else:
@@ -124,6 +186,18 @@ class BaseProblemAmplify(BaseProblem):
                 raise Exception('Unexpected type for cs_inv_poly')   
         return cs_inv_sol
     
+    def get_energy(self, index):
+        if type(self.results) is SampleSet:
+            return self.results.record[index]['energy']
+        else:
+            return self.results[index].energy
+    
+    def get_frequency(self, index):
+        if type(self.results) is SampleSet:
+            return self.results.record[index]['num_occurrences']
+        else:
+            return self.results[index].frequency
+
     def store_results(self):
         if hasattr(self, 'results'):
             # Results is of class amplify.SolverResult and stores a list of solutions.

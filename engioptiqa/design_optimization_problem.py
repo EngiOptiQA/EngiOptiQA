@@ -1,6 +1,7 @@
 from abc import abstractmethod
 import itertools
 from matplotlib import pyplot as plt
+import matplotlib.patches as patches
 import numpy as np
 import os
 
@@ -62,7 +63,7 @@ class DesignOptimizationProblem(BaseProblem):
         pass
 
     def visualize_qubo_matrix_pattern(self, show_fig=False, save_fig=False, suffix=''):
-        super().plot_qubo_matrix_pattern()
+        self.plot_qubo_matrix_pattern()
         self.annotate_qubo_matrix_pattern()
         if show_fig:
             plt.show()
@@ -80,12 +81,52 @@ class DesignOptimizationProblem(BaseProblem):
         plt.axvline(x=pos, color='gray', linestyle='dotted', linewidth=0.75)
         plt.axhline(y=pos, color='gray', linestyle='dotted', linewidth=0.75)
 
-    def visualize_qubo_matrix_sub_pattern(self, save_fig=False, suffix=''):
-        super().plot_qubo_matrix_pattern()
+    def visualize_qubo_matrix_sub_pattern(
+            self, show_fig=False, save_fig=False, suffix='',
+            highlight_cross_sections = False,
+            highlight_interactions = False
+        ):
+        self.plot_qubo_matrix_pattern()
         self.annotate_qubo_matrix_pattern()
-        plt.xlim(-0.5,((self.rod.n_comp)*(self.n_qubits_per_node+1)-1))
-        plt.ylim(((self.rod.n_comp)*(self.n_qubits_per_node+1)-1),-0.5)
+        plt.xlim(-0.5,((self.rod.n_comp)*(self.n_qubits_per_node+1)-0.5))
+        plt.ylim(((self.rod.n_comp)*(self.n_qubits_per_node)),-0.5)
+
+        if highlight_cross_sections:
+            for i_comp in range(self.rod.n_comp-1):
+                x_pos = self.rod.n_comp*self.n_qubits_per_node + i_comp - 0.5
+                y_pos = i_comp*self.n_qubits_per_node - 0.5
+                rect = patches.Rectangle(
+                    (x_pos,y_pos), 
+                    1, 
+                    2*self.n_qubits_per_node,
+                    linewidth = 2,
+                    edgecolor='red', 
+                    facecolor='none'
+                )
+                plt.gca().add_patch(rect)
+
+        if highlight_interactions:
+            for i_comp in range(1,self.rod.n_comp):
+                x_pos = self.rod.n_comp*self.n_qubits_per_node + (i_comp-1) - 0.5
+                y_pos = i_comp*self.n_qubits_per_node - 0.5
+                rect = patches.Rectangle(
+                    (x_pos,y_pos), 
+                    2, 
+                    self.n_qubits_per_node,
+                    linewidth = 2,
+                    edgecolor='orange', 
+                    facecolor='none'
+                )
+                plt.gca().add_patch(rect)
+
+        if show_fig:
+            plt.show()
         if save_fig:
+            assert(self.output_path is not None)
+            if highlight_cross_sections:
+                suffix += '_highlight_cross_sections'
+            if highlight_interactions:
+                suffix += '_highlight_interactions'
             self.save_qubo_matrix_sub_pattern(suffix)
         plt.close()
 

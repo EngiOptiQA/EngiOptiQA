@@ -25,6 +25,7 @@ class BaseProblem(ABC):
         if output_path is None:
             self.save_fig = False
         else:
+            self.save_fig = True
             if not os.path.exists(output_path):
                 os.makedirs(output_path)
                 print(f"Folder '{output_path}' created successfully.")
@@ -176,6 +177,9 @@ class BaseProblem(ABC):
             a1 = nf[i_comp]
             a2 = nf[i_comp+1]
             U_comp = cs_inv[i_comp]*(self.rod.x[i_comp+1]-self.rod.x[i_comp])/(6.0*self.rod.E[i_comp])*(a1**2+a1*a2+a2**2)
+            # TODO Scaling
+            # Remove 1/6
+            U_comp = cs_inv[i_comp]*(self.rod.x[i_comp+1]-self.rod.x[i_comp])/(self.rod.E[i_comp])*(a1**2+a1*a2+a2**2)
             U.append(U_comp) 
         # External Complementary Work.
         V = [0 for _ in range(self.rod.n_comp)]
@@ -213,8 +217,15 @@ class BaseProblem(ABC):
             #cons_eq.append(clamp(lhs,rhs_min,rhs_max))
 
             div = (a2-a1)*cs_inv[i_comp]
+            
             vol_force = (self.rod.x[i_comp+1]-self.rod.x[i_comp])*self.rod.rho[i_comp]*self.g
+
+            # Multiply equilibrium condition by cross sections to decrease magnitude.
+            #div = (a2-a1)
+            #vol_force = (self.rod.x[i_comp+1]-self.rod.x[i_comp])*self.rod.rho[i_comp]*self.g/cs_inv[i_comp]
             vol_force_squared = vol_force**2
+            # print('div:', div)
+            # print('vol_force:', vol_force)
             eq = div + vol_force
 
             # Penalty term.
@@ -226,7 +237,8 @@ class BaseProblem(ABC):
             #print(i_comp,': vol_force_squared =', vol_force_squared)
             #penalty_eq.append(penalty(con_comp, le = vol_force_squared))
             
-        cons_eq = sum(cons_eq)
+        # TODO Scaling
+        cons_eq = sum(cons_eq)/self.rod.n_comp #scaling?
         #con.append(cons_eq)
         #print('Penalty polynomial equlibrium\n\t', cons_eq)
         # print('\tNumber of terms:',cons_eq.count())
@@ -278,44 +290,81 @@ class BaseProblem(ABC):
     def visualize_qubo_matrix(self, show_fig=False, save_fig=False, suffix=''):
         pass
 
-    def visualize_qubo_matrix_pattern(self, show_fig=False, save_fig=False, suffix=''):
-        self.plot_qubo_matrix_pattern()
-        if show_fig:
-            plt.show()
-        if save_fig:
-            assert(self.output_path is not None)
-            self.save_qubo_matrix_pattern(suffix)
-        plt.close()
-
     @abstractmethod
     def plot_qubo_matrix_pattern(self):
         pass
+
+    def visualize_qubo_matrix_pattern(self, show_fig=False, save_fig=False, suffix='', highlight_nodes=False, highlight_interactions=False):
+        self.plot_qubo_matrix_pattern(highlight_nodes=highlight_nodes, highlight_interactions=highlight_interactions)
+        if save_fig:
+            assert(self.output_path is not None)
+            if highlight_nodes:
+                suffix += '_highlight_nodes'
+            if highlight_interactions:
+                suffix += '_highlight_interactions'
+            self.save_qubo_matrix_pattern(suffix)
+        if show_fig:
+            plt.show()
+
+        plt.close()
      
     def save_qubo_matrix_pattern(self, suffix=''):
         file_name = os.path.join(self.output_path, self.name.lower().replace(' ', '_') + '_QUBO_pattern' + suffix)
         plt.savefig(file_name, dpi=600)
         
-    def analyze_results(self, analysis_plots=True, result_max=sys.maxsize):
+    @abstractmethod
+    def get_energy(self, index):
+        pass
 
-        if hasattr(self, 'results'):
-            self.errors_force_rel = [np.Inf for _ in range(len(self.results))]
-            for i_result, result in enumerate(self.results):
-                if i_result > result_max:
-                    break
+    @abstractmethod
+    def get_frequency(self, index):
+        pass    
+
+    def analyze_results(self, results=None, analysis_plots=True, result_max=sys.maxsize):
+
+        if results is None and not hasattr(self, 'results'):
+            raise Exception('Attempt to analyze results, but no results exist or have been passed.')
+        elif results is None and hasattr(self, 'results'):
+            results = self.results
+
+        self.errors_force_rel = [np.Inf for _ in range(len(results))]
+        solutions = [{'error_abs': np.Inf, 'energy': np.Inf} for _ in range(len(results))]
+        solutions = [{} for _ in range(len(results))]
+        for i_result, result in enumerate(results):
+            # Decode solution, i.e., evaluate nodal forces and inverse of cross sections.
+            nf_sol = self.decode_nodal_force_solution(result)
+            cs_inv_sol = self.decode_cross_section_inverse_solution(result)
+            # Compute complementary energy.
+            PI_sol =  self.complementary_energy(nf_sol, cs_inv_sol)
+            # Evaluate constraints.
+            con_eq_sol, con_bc_sol = self.constraints(nf_sol, cs_inv_sol)
+            # Compute objective function.
+            obj_sol = PI_sol + self.penalty_weight_equilibrium*con_eq_sol + 0.0*con_bc_sol
+            # Compute symbolic force and stress functions.
+            force_sol, stress_sol = self.symbolic_force_and_stress_functions(nf_sol, cs_inv_sol)
+            # Compute error with respect to analytic solution.
+            error_l2_force_abs, error_l2_force_rel = self.rel_error_l2(self.force_analytic, force_sol)
+            error_h1_force_abs, error_h1_force_rel = self.rel_error_h1(self.force_analytic, force_sol) 
+            self.errors_force_rel[i_result] = error_l2_force_rel
+            solutions[i_result]['force'] = force_sol
+            solutions[i_result]['error_l2_abs'] = error_l2_force_abs
+            solutions[i_result]['error_l2_rel'] = error_l2_force_rel
+            solutions[i_result]['error_h1_abs'] = error_h1_force_abs
+            solutions[i_result]['error_h1_rel'] = error_h1_force_rel
+            solutions[i_result]['complementary_energy'] = PI_sol
+            solutions[i_result]['constraints'] = con_eq_sol
+            solutions[i_result]['objective'] = obj_sol
+            solutions[i_result]['energy'] = self.get_energy(i_result)
+            solutions[i_result]['frequency'] = self.get_frequency(i_result)
+            solutions[i_result]['nf'] = nf_sol
+            solutions[i_result]['cs_inv'] = cs_inv_sol
+            # Output of analysis.
+            if i_result < result_max:
                 output = f'Solution {i_result}\n'
-                #print(f"\tenergy = {result.energy}, frequency = {result.frequency}")
-                #output+= f'\tenergy = {result.energy}, frequency = {result.frequency}\n'
+                output+= f"\tenergy = {solutions[i_result]['energy']}, frequency = {solutions[i_result]['frequency']}\n"
                 self.print_and_log(output)
-                nf_sol = self.decode_nodal_force_solution(result)
-                cs_inv_sol = self.decode_cross_section_inverse_solution(result)
-                #self.print_nodal_force_and_cross_section_inverse(nf_sol, cs_inv_sol)
-                PI_sol =  self.complementary_energy(nf_sol, cs_inv_sol)
-                con_eq_sol, con_bc_sol = self.constraints(nf_sol, cs_inv_sol)
-                obj_sol = PI_sol + self.penalty_weight_equilibrium*con_eq_sol + 0.0*con_bc_sol
-                force_sol, stress_sol = self.symbolic_force_and_stress_functions(nf_sol, cs_inv_sol)
-                error_force_abs, error_force_rel = self.rel_error(self.force_analytic, force_sol) 
-                self.errors_force_rel[i_result] = error_force_rel
-                self.print_solution_quantities(PI_sol, con_eq_sol, con_bc_sol, obj_sol, error_force_abs, error_force_rel)
+                self.print_nodal_force_and_cross_section_inverse(nf_sol, cs_inv_sol)
+                self.print_solution_quantities(PI_sol, con_eq_sol, con_bc_sol, obj_sol, error_l2_force_abs, error_l2_force_rel)
                 # Plot Solution
                 if analysis_plots:
                     if self.output_path is not None:
@@ -326,13 +375,12 @@ class BaseProblem(ABC):
                         file_name_force = None
                         file_name_stress = None
                         file_name_rod = None
-                    self.plot_force(self.force_analytic, force_sol, file_name_force, self.save_fig) 
+                    self.plot_force(self.force_analytic, force_sol, file_name = file_name_force, save_fig = self.save_fig) 
                     #self.plot_stress(self.stress_analytic, stress_sol, file_name_stress, self.save_fig)
                     #rod_tmp = Rod1D(self.rod.n_comp, self.rod.L, 0.0)
                     #rod_tmp.set_cross_sections_from_inverse(cs_inv_sol)
                     #rod_tmp.visualize(file_name_rod, self.save_fig)
-        else:
-            raise Exception('Trying to analyze results but no results exist.')
+        return solutions
 
     @abstractmethod
     def store_results(self):
@@ -361,7 +409,6 @@ class BaseProblem(ABC):
     def decode_cross_section_inverse_solution(self, result):
         pass
 
-    
     def print_nodal_force_and_cross_section_inverse(self, nf_sol, cs_inv_sol):
         for i_comp in range(self.rod.n_comp):
             output = f'\tComponent {i_comp}\n'
@@ -389,24 +436,33 @@ class BaseProblem(ABC):
         return force_fun, stress_fun
     
     # Plot Force Solutions.
-    def plot_force(self, force_analyt, force_num, file_name=None, save_fig=False):
+    def plot_force(self, force_analyt, force_num, subtitle=None, file_name=None, save_fig=False):
         x_plot = []
         force_num_plot = []
         force_analyt_plot = []
         plt.figure()
+        for i_node in range(self.rod.n_comp+1):
+            plt.axvline(x=self.rod.x[i_node], color='gray', linestyle='--', linewidth=1.5)  
+            
         for i_comp in range(self.rod.n_comp):
-            plt.axvline(x=self.rod.x[i_comp+1], color='gray', linestyle='--', linewidth=1)
             for i_x in np.linspace(self.rod.x[i_comp], self.rod.x[i_comp+1], 10):
                 x_plot.append(i_x)
                 force_num_plot.append(force_num[i_comp].subs(self.x_sym, i_x))
                 force_analyt_plot.append(force_analyt[i_comp].subs(self.x_sym, i_x))
 
-        plt.plot(x_plot, force_analyt_plot, label = "analytical solution") 
-        plt.plot(x_plot, force_num_plot, label = "numerical solution")   
+        plt.plot(x_plot, force_analyt_plot, 'k', label = "Analytical Solution") 
+        plt.plot(x_plot, force_num_plot, 'm', label = "Numerical Solution")   
+
+        for i_comp in range(self.rod.n_comp):
+            plt.plot(self.rod.x[i_comp], force_num[i_comp].subs(self.x_sym, self.rod.x[i_comp]),'mo')
+
         plt.xlabel('x')
         plt.ylabel('Force')
-        plt.title('Force')
-        plt.grid(linestyle = '--', linewidth = 0.5)
+        if subtitle:
+            plt.title(self.name+'\n'+subtitle)
+        else:
+            plt.title(self.name)
+
         plt.legend()        
         if save_fig:
             plt.savefig(file_name, dpi=600)
@@ -436,15 +492,69 @@ class BaseProblem(ABC):
             plt.savefig(file_name, dpi=600)
 
     # Relative Error betweeen Analytical and Numerical Force-Solution.
-    def rel_error(self, fun_analyt, fun_num):
+    def rel_error_l2(self, fun_analyt, fun_num):
         quad_norm_diff_fun = []
         quad_norm_fun = []
         for i_comp in range(self.rod.n_comp):
             diff_fun = fun_analyt[i_comp] - fun_num[i_comp]
-            quad_norm_diff_fun.append(quad(lambda x_int: (diff_fun.subs(self.x_sym, x_int))**2, self.rod.x[i_comp], self.rod.x[i_comp+1])[0])
-            quad_norm_fun.append(quad(lambda x_int: (fun_analyt[i_comp].subs(self.x_sym, x_int))**2, self.rod.x[i_comp], self.rod.x[i_comp+1])[0])
+            quad_norm_diff_fun.append(
+                quad(
+                    lambda x_int: (diff_fun.subs(self.x_sym, x_int))**2, 
+                    self.rod.x[i_comp], 
+                    self.rod.x[i_comp+1]
+                )[0]
+            )
+            quad_norm_fun.append(
+                quad(
+                    lambda x_int: (fun_analyt[i_comp].subs(self.x_sym, x_int))**2, 
+                    self.rod.x[i_comp], 
+                    self.rod.x[i_comp+1]
+                )[0]
+            )
         error_abs = np.sqrt(sum(quad_norm_diff_fun))
         error_rel = error_abs / np.sqrt(sum(quad_norm_fun))
+
         return error_abs, error_rel   
+    
+    # Relative Error betweeen Analytical and Numerical Force-Solution.
+    def rel_error_h1(self, fun_analyt, fun_num):
+        quad_norm_diff_fun = []
+        quad_norm_fun = []
+        for i_comp in range(self.rod.n_comp):
+            diff_fun = fun_analyt[i_comp] - fun_num[i_comp]
+            d_diff_fun_d_x = sp.diff(diff_fun)
+            d_fun_analyt_d_x = sp.diff(fun_analyt[i_comp])
+            quad_norm_diff_fun.append(
+                quad(
+                    lambda x_int: (diff_fun.subs(self.x_sym, x_int))**2, 
+                    self.rod.x[i_comp], 
+                    self.rod.x[i_comp+1]
+                )[0]
+                +
+                quad(
+                    lambda x_int: (d_diff_fun_d_x.subs(self.x_sym, x_int))**2, 
+                    self.rod.x[i_comp], 
+                    self.rod.x[i_comp+1]
+                )[0]
+
+            )
+            quad_norm_fun.append(
+                quad(
+                    lambda x_int: (fun_analyt[i_comp].subs(self.x_sym, x_int))**2, 
+                    self.rod.x[i_comp], 
+                    self.rod.x[i_comp+1]
+                )[0]
+                +
+                quad(
+                    lambda x_int: (d_fun_analyt_d_x.subs(self.x_sym, x_int))**2, 
+                    self.rod.x[i_comp], 
+                    self.rod.x[i_comp+1]
+                )[0]                
+
+            )
+        error_abs = np.sqrt(sum(quad_norm_diff_fun))
+        error_rel = error_abs / np.sqrt(sum(quad_norm_fun))
+
+        return error_abs, error_rel 
 
    
