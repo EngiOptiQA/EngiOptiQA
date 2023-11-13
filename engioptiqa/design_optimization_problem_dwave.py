@@ -7,10 +7,10 @@ class DesignOptimizationProblemDWave(BaseProblemDWave, DesignOptimizationProblem
 
     def __init__(self, rod, g, A_choice, output_path=None):
         raise Exception(
-            "Solution of design optimization problems "
+            "Using design optimization problems created"
             "with DWave SDK not yet supported."
-            )
-        
+            )  
+          
     def generate_discretization(self, n_qubits_per_node, binary_representation):
         BaseProblemDWave.generate_nodal_force_polys(self, n_qubits_per_node, binary_representation)
         self.generate_cross_section_polys()
