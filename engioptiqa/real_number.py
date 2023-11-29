@@ -68,8 +68,10 @@ class RealNumber:
                 q_opt = q
 
         diff_opt_rel = diff_opt/np.abs(value_to_approximate)
-        #print('Value:', value_to_approximate,\
-        #      'Approximation:', self.evaluate(q_opt),\
-        #      'Difference:', diff_opt, \
-        #      'Relative Difference', diff_opt_rel)
+
+        print('Value:', value_to_approximate,\
+             'Approximation:', self.evaluate(q_opt),\
+             'Difference:', diff_opt, \
+             'Relative Difference', diff_opt_rel)
+        
         return diff_opt, diff_opt_rel

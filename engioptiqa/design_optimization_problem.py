@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 import os
+import tikzplotlib
 
 from .rod_1d import Rod1D
 from .base_problem import BaseProblem
@@ -57,18 +58,23 @@ class DesignOptimizationProblem(BaseProblem):
 
         output = f'Analytic Force: {self.force_analytic}\n'
         self.print_and_log(output)
-
+        
     @abstractmethod
     def generate_cross_section_polys(self):
         pass
 
-    def visualize_qubo_matrix_pattern(self, show_fig=False, save_fig=False, suffix=''):
+    def visualize_qubo_matrix_pattern(self, show_fig=False, save_fig=False, save_tikz=False, suffix=''):
         self.plot_qubo_matrix_pattern()
         self.annotate_qubo_matrix_pattern()
         if show_fig:
             plt.show()
-        if save_fig:
-            super().save_qubo_matrix_pattern(suffix)
+        if save_fig or save_tikz:
+            assert(self.output_path is not None)
+            file_name = os.path.join(self.output_path, self.name.lower().replace(' ', '_') + '_QUBO_pattern' + suffix)
+            if save_fig:
+                plt.savefig(file_name, dpi=600)
+            if save_tikz:
+                tikzplotlib.save(file_name + '.tex')
         plt.close()
 
     def annotate_qubo_matrix_pattern(self):
@@ -82,7 +88,7 @@ class DesignOptimizationProblem(BaseProblem):
         plt.axhline(y=pos, color='gray', linestyle='dotted', linewidth=0.75)
 
     def visualize_qubo_matrix_sub_pattern(
-            self, show_fig=False, save_fig=False, suffix='',
+            self, show_fig=False, save_fig=False, save_tikz=False, suffix='',
             highlight_cross_sections = False,
             highlight_interactions = False
         ):
@@ -121,15 +127,15 @@ class DesignOptimizationProblem(BaseProblem):
 
         if show_fig:
             plt.show()
-        if save_fig:
+        if save_fig or save_tikz:
             assert(self.output_path is not None)
+            file_name = os.path.join(self.output_path, self.name.lower().replace(' ', '_') + '_QUBO_sub_pattern' + suffix)
             if highlight_cross_sections:
                 suffix += '_highlight_cross_sections'
             if highlight_interactions:
                 suffix += '_highlight_interactions'
-            self.save_qubo_matrix_sub_pattern(suffix)
+            if save_fig:
+                plt.savefig(file_name, dpi=600)
+            if save_tikz:
+                tikzplotlib.save(file_name + '.tex')
         plt.close()
-
-    def save_qubo_matrix_sub_pattern(self, suffix=''):
-        file_name = os.path.join(self.output_path, self.name.lower().replace(' ', '_') + '_QUBO_sub_pattern' + suffix)
-        plt.savefig(file_name, dpi=600)

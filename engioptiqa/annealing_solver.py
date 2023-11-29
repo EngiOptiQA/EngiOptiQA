@@ -5,8 +5,10 @@ from amplify.client import FixstarsClient
 from amplify.client.ocean import DWaveSamplerClient, LeapHybridSamplerClient
 
 from dwave.cloud import Client
+from dwave.preprocessing import FixVariablesComposite
+from dwave.preprocessing.composites import SpinReversalTransformComposite
 from dwave.samplers import SimulatedAnnealingSampler, SteepestDescentSolver
-from dwave.system import DWaveSampler, EmbeddingComposite, LeapHybridSampler
+from dwave.system import DWaveSampler, EmbeddingComposite, LeapHybridSampler, ReverseAdvanceComposite, ReverseBatchStatesComposite
 
 
 class AnnealingSolver(ABC):
@@ -52,22 +54,20 @@ class AnnealingSolverAmplify(AnnealingSolver):
     
     def setup_solver(self):
 
-        # Setting default parameters.
-        if self.client_type == 'fixstars':# Fixstars
+        if self.client_type == 'fixstars':
             print('Setting default timeout (ms): 800')
             self.client.parameters.timeout = 800
-        elif self.client_type == 'dwave': # DWave
+        elif self.client_type == 'dwave':
             print('Choosing default solver: Advantage_system4.1')
             self.client.solver = "Advantage_system4.1"
             print('Setting default num_reads: 200')
-            self.client.parameters.num_reads = 200  # Number of executions
-        elif self.client_type == 'dwave_hybrid': # DWave Hybrid
+            self.client.parameters.num_reads = 200 
+        elif self.client_type == 'dwave_hybrid':
             print('Choosing default solver: hybrid_binary_quadratic_model_version2')
             self.client.solver = 'hybrid_binary_quadratic_model_version2'
 
         self.solver = Solver(self.client)
         print("Created solver")
-
 
     def solve_qubo_problem(self, problem):
         
@@ -97,7 +97,13 @@ class AnnealingSolverDWave(AnnealingSolver):
             solver = self.client.get_solver(name=self.solver_name)
             if solver.qpu:
                 self.solver_type = 'qpu'
-                self.solver = EmbeddingComposite(DWaveSampler(token=self.token, proxy=self.proxy, solver=dict(name=self.solver_name)))
+                self.solver = EmbeddingComposite(
+                    DWaveSampler(
+                        token=self.token, 
+                        proxy=self.proxy, 
+                        solver=dict(name=self.solver_name)
+                    )
+                )
             else:
                 self.solver_type = 'hybrid'
                 self.solver = LeapHybridSampler(token=self.token, proxy=self.proxy)
@@ -106,8 +112,35 @@ class AnnealingSolverDWave(AnnealingSolver):
         elif solver_type:
             self.solver_type = solver_type
             if self.solver_type == 'qpu':
-                self.solver = EmbeddingComposite(DWaveSampler(token=self.token, proxy=self.proxy))
+                self.solver = EmbeddingComposite(
+                    DWaveSampler(token=self.token, proxy=self.proxy)
+                )
                 self.solver_name = self.solver.child.properties["chip_id"]
+
+            elif self.solver_type == 'qpu_preprocess_spin_reversal_transform':
+                self.solver = SpinReversalTransformComposite(
+                    EmbeddingComposite(
+                        DWaveSampler(token=self.token, proxy=self.proxy)
+                        )
+                )
+                self.solver_name = self.solver.child.child.properties["chip_id"]
+                
+            elif self.solver_type == 'qpu_preprocess':
+                self.solver = FixVariablesComposite(
+                    EmbeddingComposite(
+                        DWaveSampler(token=self.token, proxy=self.proxy)
+                    ),
+                    algorithm="roof_duality"
+                )
+                self.solver_name = self.solver.child.child.properties["chip_id"]
+
+            elif self.solver_type == 'qpu_reverse':
+                self.solver = EmbeddingComposite(
+                    ReverseBatchStatesComposite(
+                        DWaveSampler(token=self.token, proxy=self.proxy)
+                    )
+                )
+                self.solver_name = self.solver.child.child.properties["chip_id"]
 
             elif self.solver_type == 'hybrid':
                 self.solver = LeapHybridSampler(token=self.token, proxy=self.proxy)
@@ -134,7 +167,6 @@ class AnnealingSolverDWave(AnnealingSolver):
             problem.results =  problem.results_indices.relabel_variables(
                 problem.mapping_i_to_q,
                 inplace=False)
-            #problem.binary_quadratic_model.relabel_variables(problem.label_mapping_inverse,inplace=True)
         else:
             problem.results = problem.results_indices 
 

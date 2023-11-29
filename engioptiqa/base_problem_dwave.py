@@ -46,14 +46,7 @@ class BaseProblemDWave(BaseProblem):
 
         self.poly = self.complementary_energy_poly + \
              self.penalty_weight_equilibrium * self.equilibrium_constraint_poly
-        
-        # Only constraints:
-        #self.poly = self.equilibrium_constraint_poly
-        # print(model.to_qubo())
-
-        #self.binary_quadratic_model = self.poly.compile().to_bqm()
-        #print(self.binary_quadratic_model)
-        
+                
         # Two options for variables in BQM
         # 1.) q[i][j] and q_A[i] => Problem: cannot be solved 
         # 2.) indices => Problem: for design optimization problem (cubic), results cannot be analyzed
@@ -69,6 +62,7 @@ class BaseProblemDWave(BaseProblem):
                  self.mapping_i_to_q[enumerated_label] = original_label
                  enumerated_label += 1
 
+        # For the BQM of the design optimization problem, replace qubit names q_A[i] by indices
         # label_mapping_cs_inv = {}
         # label_mapping_cs_inv_inverse = {}
         # for i in range(self.rod.n_comp):
@@ -76,31 +70,20 @@ class BaseProblemDWave(BaseProblem):
         #     label_mapping_cs_inv[original_label] = enumerated_label
         #     label_mapping_cs_inv_inverse[enumerated_label] = original_label
         #     enumerated_label += 1
-
         # self.label_mapping.update(label_mapping_cs_inv)
         # self.label_mapping_inverse.update(label_mapping_cs_inv_inverse)
 
-        # print(self.label_mapping)
-        #print(self.poly)
         self.pyqubo_model = self.poly.compile()
-        #print(self.pyqubo_model)
-
-        # 
-        self.binary_quadratic_model = self.pyqubo_model.to_bqm()
-        # print(f'offset: {self.binary_quadratic_model.offset}')
-        # self.binary_quadratic_model.offset = 0.0
-        # print(f'offset: {self.binary_quadratic_model.offset}')
-        
+        self.binary_quadratic_model = self.pyqubo_model.to_bqm()       
 
         self.binary_quadratic_model_indices = self.pyqubo_model.to_bqm(index_label=True)
-        #self.binary_quadratic_model_indices = self.binary_quadratic_model.relabel_variables(self.label_mapping,inplace=False)
         
         print("Original model:", self.binary_quadratic_model)
         print("Model with indices:", self.binary_quadratic_model_indices)
 
     def visualize_qubo_matrix(self, show_fig=False, save_fig=False, suffix=''):
         
-        title = self.name + '\n QUBO Matrix (PI + Manual Penalty) \n'
+        title = self.name + '\n QUBO Matrix \n'
 
         # Visualize the QUBO Matrix.
         plt.figure()
@@ -116,7 +99,7 @@ class BaseProblemDWave(BaseProblem):
         plt.close()
 
     def plot_qubo_matrix_pattern(self, highlight_nodes = False, highlight_interactions=False):
-        title = self.name + '\n QUBO Pattern (PI + Manual Penalty) \n'
+        title = self.name + '\n QUBO Pattern \n'
         binary_matrix = np.where(self.binary_quadratic_model_indices.to_numpy_matrix() != 0, 1, 0)
         plt.figure()
         plt.suptitle(title)
@@ -137,13 +120,11 @@ class BaseProblemDWave(BaseProblem):
                 #    if (not '*' in key) and (not '_' in key) and (int(key[2]) == i_nf_poly):
                 #        filtered_variables = {key: value}
 
-
                 filtered_variables = {key: value for key, value in result.items() if int(key[2]) == i_nf_poly}
                 nf_sol.append(nf_poly_model.decode_sample(filtered_variables, vartype='Binary').energy)
 
                 # Problem: result contains indices only, nf_poly still q[i][j] etc.
                 #nf_sol.append(nf_poly_model.decode_sample(result, vartype='Binary').energy)
-
 
             elif type(nf_poly) in [float, np.float64]:
                 nf_sol.append(nf_poly)

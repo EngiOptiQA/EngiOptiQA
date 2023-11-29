@@ -6,6 +6,7 @@ from prettytable import PrettyTable
 from scipy.integrate import quad
 import sympy as sp
 import sys
+import tikzplotlib
 
 from .rod_1d import Rod1D
 
@@ -177,9 +178,6 @@ class BaseProblem(ABC):
             a1 = nf[i_comp]
             a2 = nf[i_comp+1]
             U_comp = cs_inv[i_comp]*(self.rod.x[i_comp+1]-self.rod.x[i_comp])/(6.0*self.rod.E[i_comp])*(a1**2+a1*a2+a2**2)
-            # TODO Scaling
-            # Remove 1/6
-            U_comp = cs_inv[i_comp]*(self.rod.x[i_comp+1]-self.rod.x[i_comp])/(self.rod.E[i_comp])*(a1**2+a1*a2+a2**2)
             U.append(U_comp) 
         # External Complementary Work.
         V = [0 for _ in range(self.rod.n_comp)]
@@ -195,91 +193,40 @@ class BaseProblem(ABC):
         E = self.rod.E
         PI_poly = self.complementary_energy(nf, cs_inv) 
 
-        #print('Complementary Energy:')
-        #print('\tNumber of terms:', PI_poly.count())
-        #print('\tMaximum index:', PI_poly.max_index())
-
         self.complementary_energy_poly = PI_poly     
 
     def constraints(self, nf, cs_inv):
         
         # Equilibrium.
-        con = []
         cons_eq = []
-        penalty_eq = []
-
         for i_comp in range(self.rod.n_comp):
             a1 = nf[i_comp]
             a2 = nf[i_comp+1]
-            # Constraint object.
-            #rhs_min = (1.-np.sign(rhs)*1e-1)*rhs
-            #rhs_max = (1.+np.sign(rhs)*1e-1)*rhs
-            #cons_eq.append(clamp(lhs,rhs_min,rhs_max))
 
             div = (a2-a1)*cs_inv[i_comp]
-            
             vol_force = (self.rod.x[i_comp+1]-self.rod.x[i_comp])*self.rod.rho[i_comp]*self.g
-
-            # Multiply equilibrium condition by cross sections to decrease magnitude.
-            #div = (a2-a1)
-            #vol_force = (self.rod.x[i_comp+1]-self.rod.x[i_comp])*self.rod.rho[i_comp]*self.g/cs_inv[i_comp]
-            vol_force_squared = vol_force**2
-            # print('div:', div)
-            # print('vol_force:', vol_force)
             eq = div + vol_force
 
             # Penalty term.
             # Manually.
             con_comp = eq**2
             cons_eq.append(con_comp)
-            # Penalty object.
-            #con_max = con_comp.decode([1 for _ in range(con_comp.count())])
-            #print(i_comp,': vol_force_squared =', vol_force_squared)
-            #penalty_eq.append(penalty(con_comp, le = vol_force_squared))
-            
-        # TODO Scaling
-        cons_eq = sum(cons_eq)/self.rod.n_comp #scaling?
-        #con.append(cons_eq)
-        #print('Penalty polynomial equlibrium\n\t', cons_eq)
-        # print('\tNumber of terms:',cons_eq.count())
-        # print('\tMaximum index:',cons_eq.max_index())
-        #penalty_eq = sum(penalty_eq)
-        #print('Penalty object equlibrium\n\t', penalty_eq)
+
+        cons_eq = sum(cons_eq)/self.rod.n_comp 
 
         # Traction Boundary Condition.
-        # Manually.
-        cons_bc=nf[-1]**2
-        #print('Penalty polynomial boundary conditions\n\t', cons_bc)
-        #print('\tNumber of terms:',cons_bc.count())
-        #print('\tMaximum index:',cons_bc.max_index())
-        #con.append(cons_bc)
+        traction_bc = 0.0
+        cons_bc=(nf[-1]-traction_bc)**2
 
-        # Constraint object.
-        #cons_bc_obj = equal_to(nf[-1],0)
-
-        # Total penalty polynomial.
-        #con = sum(con)
-        #print('Penalty polynomial\n\t', con)
-        #print('\tNumber of terms:',con.count())
-        #print('\tMaximum index:',con.max_index())
         return cons_eq, cons_bc
 
     def generate_constraint_polys(self):
-        n_comp = self.rod.n_comp
+
         nf = self.nf_polys
         cs_inv = self.cs_inv_polys
-        x = self.rod.x
-        rho = self.rod.rho
-        g = self.g
         con_eq, con_bc = self.constraints(nf, cs_inv)
-        #print('Constraints:')
-        #print('\tEqulibrium:')
-        #print('\t\tNumber of terms:',con_eq.count())
-        #print('\t\tMaximum index:',con_eq.max_index())
-        #print('\tBoundary Condition:')
-        #print('\t\tNumber of terms:',con_bc.count())
-        #print('\t\tMaximum index:',con_bc.max_index())
 
+        # Only consider equilibrium constraint, since traction BC is built into ansatz.
         self.equilibrium_constraint_poly =  con_eq
 
     @abstractmethod
@@ -294,23 +241,23 @@ class BaseProblem(ABC):
     def plot_qubo_matrix_pattern(self):
         pass
 
-    def visualize_qubo_matrix_pattern(self, show_fig=False, save_fig=False, suffix='', highlight_nodes=False, highlight_interactions=False):
+    def visualize_qubo_matrix_pattern(self, show_fig=False, save_fig=False, save_tikz=False, suffix='', highlight_nodes=False, highlight_interactions=False):
         self.plot_qubo_matrix_pattern(highlight_nodes=highlight_nodes, highlight_interactions=highlight_interactions)
-        if save_fig:
+        if save_fig or save_tikz:
             assert(self.output_path is not None)
+            file_name = os.path.join(self.output_path, self.name.lower().replace(' ', '_') + '_QUBO_pattern' + suffix)
             if highlight_nodes:
                 suffix += '_highlight_nodes'
             if highlight_interactions:
                 suffix += '_highlight_interactions'
-            self.save_qubo_matrix_pattern(suffix)
+            if save_fig:
+                plt.savefig(file_name, dpi=600)
+            if save_tikz:
+                tikzplotlib.save(file_name + '.tex')
         if show_fig:
             plt.show()
-
         plt.close()
      
-    def save_qubo_matrix_pattern(self, suffix=''):
-        file_name = os.path.join(self.output_path, self.name.lower().replace(' ', '_') + '_QUBO_pattern' + suffix)
-        plt.savefig(file_name, dpi=600)
         
     @abstractmethod
     def get_energy(self, index):
@@ -330,6 +277,14 @@ class BaseProblem(ABC):
         self.errors_force_rel = [np.Inf for _ in range(len(results))]
         solutions = [{'error_abs': np.Inf, 'energy': np.Inf} for _ in range(len(results))]
         solutions = [{} for _ in range(len(results))]
+
+        self.errors_l2_rel = []
+        self.errors_h1_rel = []
+        self.objectives = []
+        self.comp_energies = []
+        self.errors_comp_energy_rel = []
+        self.cs_inv =[]
+        self.cs = []
         for i_result, result in enumerate(results):
             # Decode solution, i.e., evaluate nodal forces and inverse of cross sections.
             nf_sol = self.decode_nodal_force_solution(result)
@@ -358,6 +313,15 @@ class BaseProblem(ABC):
             solutions[i_result]['frequency'] = self.get_frequency(i_result)
             solutions[i_result]['nf'] = nf_sol
             solutions[i_result]['cs_inv'] = cs_inv_sol
+
+            self.errors_l2_rel.append(error_l2_force_rel)
+            self.errors_h1_rel.append(error_h1_force_rel)
+            self.objectives.append(obj_sol)
+            self.comp_energies.append(PI_sol)
+            self.errors_comp_energy_rel.append(abs(PI_sol-self.PI_analytic)/abs(self.PI_analytic))
+            self.cs_inv.append(cs_inv_sol)
+            self.cs.append([1/cs_inv for cs_inv in cs_inv_sol])
+
             # Output of analysis.
             if i_result < result_max:
                 output = f'Solution {i_result}\n'
@@ -375,11 +339,20 @@ class BaseProblem(ABC):
                         file_name_force = None
                         file_name_stress = None
                         file_name_rod = None
-                    self.plot_force(self.force_analytic, force_sol, file_name = file_name_force, save_fig = self.save_fig) 
-                    #self.plot_stress(self.stress_analytic, stress_sol, file_name_stress, self.save_fig)
-                    #rod_tmp = Rod1D(self.rod.n_comp, self.rod.L, 0.0)
-                    #rod_tmp.set_cross_sections_from_inverse(cs_inv_sol)
-                    #rod_tmp.visualize(file_name_rod, self.save_fig)
+                    self.plot_force(self.force_analytic, force_sol, file_name=file_name_force, save_fig=self.save_fig) 
+                    self.plot_stress(self.stress_analytic, stress_sol, file_name=file_name_stress, save_fig=self.save_fig)
+                    rod_tmp = Rod1D(self.rod.n_comp, self.rod.L, 0.0)
+                    rod_tmp.set_cross_sections_from_inverse(cs_inv_sol)
+                    rod_tmp.visualize(file_name=file_name_rod, save_fig=self.save_fig)
+            
+        output = 'Best solution (minimum objective):\n'
+        i_min =np.argsort(self.objectives)
+        i_sol = i_min[0]
+        error_l2 = solutions[i_sol]['error_l2_rel']
+        error_h1 = solutions[i_sol]['error_h1_rel']
+        output += f'L2 Error {error_l2} {self.errors_l2_rel[i_sol]}\nH1 Error {error_h1} {self.errors_h1_rel[i_sol]}\n'
+        self.print_and_log(output)
+
         return solutions
 
     @abstractmethod
@@ -434,9 +407,27 @@ class BaseProblem(ABC):
         for i_comp in range(self.rod.n_comp):
             stress_fun.append(force_fun[i_comp]*cs_inv_sol[i_comp])
         return force_fun, stress_fun
-    
+
+    def show_error_over_objective(self):
+        
+        fig, ax1 = plt.subplots()
+
+        ax1.set_xlabel('Objective')
+        ax1.set_ylabel('Error')
+        ax1.set_yscale('log')  
+        ax1.set_xscale('log') 
+        ax1.plot(self.objectives, self.errors_l2_rel, marker='*', color='tab:blue', linestyle='none', label='Error L2')
+        ax1.plot(self.objectives, self.errors_h1_rel, marker='+', color='tab:orange', linestyle='none', label='Error H1')
+
+        ax2 = ax1.twinx()  
+        ax2.plot(self.objectives, self.errors_comp_energy_rel, marker='o', color='tab:red', linestyle='none', label='Error Compl. Energy')
+        ax2.set_yscale('log') 
+        ax2.set_ylabel('Error Complementary Energy')
+
+        fig.show()
+
     # Plot Force Solutions.
-    def plot_force(self, force_analyt, force_num, subtitle=None, file_name=None, save_fig=False):
+    def plot_force(self, force_analyt, force_num, subtitle=None, file_name=None, save_fig=False, save_tikz=False):
         x_plot = []
         force_num_plot = []
         force_analyt_plot = []
@@ -466,30 +457,43 @@ class BaseProblem(ABC):
         plt.legend()        
         if save_fig:
             plt.savefig(file_name, dpi=600)
+        if save_tikz:
+            tikzplotlib.save(file_name+".tex")
+
     
     # Plot Stress Solutions.
-    def plot_stress(self, stress_analyt, stress_num, file_name=None, save_fig=False):
+    def plot_stress(self, stress_analyt, stress_num, subtitle=None, file_name=None, save_fig=False, save_tikz=False):
         x_plot = []
         stresses_num_plot = []
         stresses_analyt_plot = []
         plt.figure()
-        for i_comp in range(self.rod.n_comp):
-            plt.axvline(x=self.rod.x[i_comp+1], color='gray', linestyle='--', linewidth=1)
+        for i_node in range(self.rod.n_comp+1):
+            plt.axvline(x=self.rod.x[i_node], color='gray', linestyle='--', linewidth=1.5)  
 
+        for i_comp in range(self.rod.n_comp):
             for i_x in np.linspace(self.rod.x[i_comp], self.rod.x[i_comp+1], 10):
                 x_plot.append(i_x)
                 stresses_num_plot.append(stress_num[i_comp].subs(self.x_sym, i_x))
                 stresses_analyt_plot.append(stress_analyt[i_comp].subs(self.x_sym, i_x))
 
-        plt.plot(x_plot, stresses_analyt_plot, label = "analytical solution")  
-        plt.plot(x_plot, stresses_num_plot, label = "numerical solution")  
+        plt.plot(x_plot, stresses_analyt_plot, label = "Analytical Solution")  
+        plt.plot(x_plot, stresses_num_plot, label = "Numerical Solution") 
+
+        for i_comp in range(self.rod.n_comp):
+            plt.plot(self.rod.x[i_comp], stress_num[i_comp].subs(self.x_sym, self.rod.x[i_comp]),'mo')
+
         plt.xlabel('x')
         plt.ylabel('Stress')
-        plt.title('Stress Distribution')
-        plt.grid(linestyle = '--', linewidth = 0.5)
+        if subtitle:
+            plt.title(self.name+'\n'+subtitle)
+        else:
+            plt.title(self.name)
+
         plt.legend()        
         if save_fig:
             plt.savefig(file_name, dpi=600)
+        if save_tikz:
+            tikzplotlib.save(file_name+".tex")
 
     # Relative Error betweeen Analytical and Numerical Force-Solution.
     def rel_error_l2(self, fun_analyt, fun_num):

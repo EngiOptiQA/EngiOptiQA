@@ -14,6 +14,7 @@ import matplotlib.patches as patches
 import numpy as np
 import os
 import pickle
+import tikzplotlib
 
 from .base_problem import BaseProblem
 from .real_number import RealNumber
@@ -52,25 +53,24 @@ class BaseProblemAmplify(BaseProblem):
         self.PI_qubo_matrix, self.PI_QUBO_const = PI_quadratic_model.logical_matrix
         self.constraints_qubo_matrix, self.constraints_QUBO_const = constraints_quadratic_model.logical_matrix
 
-        PI_abs = np.abs(self.PI_qubo_matrix.to_numpy())
-        PI_max = np.max(PI_abs)
-        #print("Magnitude Complementary Energy", PI_max)
-
-        con_eq_abs = np.abs(self.constraints_qubo_matrix.to_numpy())
-        con_eq_max = np.max(con_eq_abs)
-        #print("Magnitude Constraint EQ", con_eq_max)
-
         # TODO Scaling
+        # PI_abs = np.abs(self.PI_qubo_matrix.to_numpy())
+        # PI_max = np.max(PI_abs)
+        # print("Magnitude Complementary Energy", PI_max)
+
+        # con_eq_abs = np.abs(self.constraints_qubo_matrix.to_numpy())
+        # con_eq_max = np.max(con_eq_abs)
+        # print("Magnitude Constraint EQ", con_eq_max)
+
         # Options for penalty weight:
         # 1. Scale
-        self.penalty_weight_equilibrium = PI_max/con_eq_max * penalty_weight
+        # self.penalty_weight_equilibrium = PI_max/con_eq_max * penalty_weight
         # 2. Do not scale
         self.penalty_weight_equilibrium = penalty_weight
-
+        print(f"Effective penalty weight: {self.penalty_weight_equilibrium}\n")
         self.poly = self.complementary_energy_poly + \
             self.penalty_weight_equilibrium * self.equilibrium_constraint_poly
 
-        # print(self.poly)
         if self.quad_method is not None:
             print(self.quad_method)
             self.binary_quadratic_model = BinaryQuadraticModel(self.poly, method=self.quad_method)
@@ -85,6 +85,7 @@ class BaseProblemAmplify(BaseProblem):
 
     def update_penalty_weight_in_qubo_formulation(self, penalty_weight = 1.0):
         self.penalty_weight_equilibrium = penalty_weight
+        print(f"Effective penalty weight: {self.penalty_weight_equilibrium}\n")
         self.poly = self.complementary_energy_poly + \
             self.penalty_weight_equilibrium * self.equilibrium_constraint_poly
         if self.quad_method is not None:
@@ -92,10 +93,8 @@ class BaseProblemAmplify(BaseProblem):
         else:
             self.binary_quadratic_model = BinaryQuadraticModel(self.poly)
         
-    def visualize_qubo_matrix(self, show_fig=False, save_fig=False, suffix=''):
-        title = self.name + '\n QUBO Matrix (PI + Manual Penalty) \n'
-        # if hasattr(self, 'quad_method_name'):
-            # title += self.quad_method_name
+    def visualize_qubo_matrix(self, show_fig=False, save_fig=False, save_tikz=False, suffix=''):
+        title = self.name + '\n QUBO Matrix \n'
 
         # Visualize the QUBO Matrix.
         plt.figure()
@@ -104,10 +103,13 @@ class BaseProblemAmplify(BaseProblem):
         plt.colorbar()
         if show_fig:
             plt.show()
-        if save_fig:
+        if save_fig or save_tikz:
             assert(self.output_path is not None)
             file_name = os.path.join(self.output_path, self.name.lower().replace(' ', '_') + '_qubo_matrix' + suffix)
-            plt.savefig(file_name, dpi=600)
+            if save_fig:
+                plt.savefig(file_name, dpi=600)
+            if save_tikz:
+                tikzplotlib.save(file_name + '.tex')
         plt.close()
 
     def plot_qubo_matrix_pattern(self, highlight_nodes=False, highlight_interactions=False):
@@ -164,14 +166,15 @@ class BaseProblemAmplify(BaseProblem):
         for nf_poly in self.nf_polys:
             if type(nf_poly) is BinaryPoly:
                 if type(result) is SampleView:
-                    nf_sol.append(nf_poly.decode(result))
+                    result_tmp = [int(x) for x in result._data]
+                    nf_sol.append(nf_poly.decode(result_tmp))
                 else:
                     nf_sol.append(nf_poly.decode(result.values))
             elif type(nf_poly) in [float, np.float64]:
                 nf_sol.append(nf_poly)
             else:
                 print(type(nf_poly))
-                raise Exception('Unexpected type for nf_poly')  
+                raise Exception('Unexpected type for nf_poly') 
         return nf_sol      
 
     def decode_cross_section_inverse_solution(self, result):
@@ -180,14 +183,15 @@ class BaseProblemAmplify(BaseProblem):
         for cs_inv_poly in self.cs_inv_polys:
             if type(cs_inv_poly) is BinaryPoly:
                 if type(result) is SampleView:
-                    cs_inv_sol.append(cs_inv_poly.decode(result))
+                    result_tmp = [int(x) for x in result._data]
+                    cs_inv_sol.append(cs_inv_poly.decode(result_tmp))
                 else:
                     cs_inv_sol.append(cs_inv_poly.decode(result.values))   
             elif type(cs_inv_poly) in [float, np.float64]:
                 cs_inv_sol.append(cs_inv_poly)
             else:
                 print(type(cs_inv_poly))
-                raise Exception('Unexpected type for cs_inv_poly')   
+                raise Exception('Unexpected type for cs_inv_poly')
         return cs_inv_sol
     
     def get_energy(self, index):

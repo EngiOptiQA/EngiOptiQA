@@ -50,12 +50,6 @@ class Rod1D:
             ax.bar(0, length, width=width, bottom=bottom, align='center', label=str(i_comp),edgecolor='black', facecolor='gray')
             bottom += length
 
-    # ax.set_xlabel('Composite Bar')
-    # ax.set_ylabel('Height')
-    # ax.set_title('Composite Bar with Variable Cross Sections')
-    # ax.set_xticks([0])
-    # ax.set_xticklabels(['Composite Bar'])
-    # ax.legend()
         plt.gca().invert_yaxis()
         plt.tight_layout()
         if save_fig:
