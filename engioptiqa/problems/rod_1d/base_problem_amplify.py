@@ -18,7 +18,7 @@ import tikzplotlib
 
 from .base_problem import BaseProblem
 from engioptiqa.variables.real_number import RealNumber
-from engioptiqa.solution_emulator import SolutionEmulator
+from ..solution_emulator import SolutionEmulator
 
 class BaseProblemAmplify(BaseProblem):
 
