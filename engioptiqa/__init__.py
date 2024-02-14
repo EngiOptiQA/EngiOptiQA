@@ -1,4 +1,5 @@
-from .annealing_solver import AnnealingSolverAmplify, AnnealingSolverDWave
+from .annealing_solver_amplify import AnnealingSolverAmplify
+from .annealing_solver_dwave import AnnealingSolverDWave
 from .rod_1d import Rod1D
 from .design_optimization_problem_amplify import DesignOptimizationProblemAmplify
 from .design_optimization_problem_dwave import DesignOptimizationProblemDWave
