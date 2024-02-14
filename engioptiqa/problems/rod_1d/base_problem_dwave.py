@@ -4,7 +4,7 @@ import os
 from pyqubo import Array, Base
 
 from .base_problem import BaseProblem
-from .real_number import RealNumber
+from engioptiqa.variables import RealNumber
 
 class BaseProblemDWave(BaseProblem):
 
