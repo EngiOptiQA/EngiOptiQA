@@ -1,2 +1,9 @@
 from .rod_1d import *
-from .solution_emulator import SolutionEmulator
+
+__all__ = [
+    "DesignOptimizationProblemAmplify",
+    "DesignOptimizationProblemDWave",
+    "Rod1D",
+    "StructuralAnalysisProblemAmplify",
+    "StructuralAnalysisProblemDWave"
+]
