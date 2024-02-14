@@ -4,8 +4,6 @@ __all__ = [
     "AnnealingSolverAmplify",
     "AnnealingSolverDWave",
     "DesignOptimizationProblemAmplify",
-    "DesignOptimizationProblemDWave",
     "Rod1D",
     "StructuralAnalysisProblemAmplify",
-    "StructuralAnalysisProblemDWave"
 ]
