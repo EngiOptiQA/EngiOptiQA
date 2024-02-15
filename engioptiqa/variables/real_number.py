@@ -3,7 +3,16 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 class RealNumber:
+    """
+    This class implements different binary representations of a real-valued variable.
+    """    
     def __init__(self, n_qubits, representation):
+        """
+            Initialize a specific representation using a number of qubits.
+
+            :param n_qubits: The number of qubits used in the representation.
+            :param representation: The type of representation.
+        """
         self.n_qubits = n_qubits 
         self.representation = representation
 
