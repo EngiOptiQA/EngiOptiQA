@@ -6,24 +6,55 @@
 Welcome to EngiOptiQA's documentation!
 ======================================
 
+*EngiOptiQA* is a software project that allows to perform **Engi**\neering **Opti**\mization with **Q**\uantum **A**\nnealing.
+
+Overview
+========
+
+*EngiOptiQA* consists of three main modules:
+
+1. :ref:`Annealing Solvers Module<solvers-module>`
+2. :ref:`Problems Module<problems-module>`
+3. :ref:`Variables Module<variables-module>`
+
+.. _solvers-module:
+
+Annealing Solvers Module
+========================
+
+This module contains solvers for *Quadratic Unconstrained Binary Optimization (QUBO)* problems.
+There are two alternative implementations based on the `Fixstars Amplify SDK <https://amplify.fixstars.com/en/sdk>`_ or the `DWave Ocean SDK <https://www.dwavesys.com/solutions-and-products/ocean/>`_, respectively.
+
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
-.. automodule:: engioptiqa.annealing_solvers
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   annealing_solvers
 
-.. automodule:: engioptiqa.problems
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. _problems-module:
 
-.. automodule:: engioptiqa.variables
-   :members:
-   :undoc-members:
-   :show-inheritance:
+Problems Module
+===============
+
+This modules provides classes for setting up *QUBO* problems. 
+So far, this includes the one-dimensional problem of a rod.
+
+.. toctree::
+   :maxdepth: 2
+
+   problems
+
+.. _variables-module:
+
+Variables Module
+================
+
+This module includes classes for the representation of variables in logical qubits.
+At the moment, there exist different options for representing real-valued variables.
+
+.. toctree::
+   :maxdepth: 2
+
+   variables
 
 Indices and tables
 ==================
@@ -31,3 +62,7 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+
+
+
