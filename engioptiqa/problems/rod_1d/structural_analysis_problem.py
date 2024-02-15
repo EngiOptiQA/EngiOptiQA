@@ -25,6 +25,11 @@ class StructuralAnalysisProblem(BaseProblem):
         output = f'Analytic Force: {self.force_analytic}\n'
         self.print_and_log(output)
 
+    def generate_discretization(self, n_qubits_per_node, binary_representation):
+        BaseProblem.initialize_discretization(self)
+        BaseProblem.generate_nodal_force_polys(self, n_qubits_per_node, binary_representation)
+        self.generate_cross_section_inverse_polys()
+
     def generate_cross_section_inverse_polys(self):
         cs_inv_polys = []
         for _ in range(self.rod.n_comp):
