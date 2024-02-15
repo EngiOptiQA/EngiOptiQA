@@ -1,7 +1,7 @@
 from .rod_1d import *
 
 __all__ = [
-    "DesignOptimizationProblemAmplify",
+    "DesignOptimizationProblem",
     "Rod1D",
-    "StructuralAnalysisProblemAmplify"
+    "StructuralAnalysisProblem"
 ]
