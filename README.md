@@ -1,4 +1,4 @@
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10222618.svg)](https://doi.org/10.5281/zenodo.10222618)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10222617.svg)](https://doi.org/10.5281/zenodo.10222617)
 # EngiOptiQA: Engineering Optimization with Quantum Annealing
 
 **Please note:** _EngiOptiQA_ is currently in a very early stage of development. As the project progresses, documentation, additional features, and enhancements will be added. 
