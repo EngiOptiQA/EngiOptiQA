@@ -29,4 +29,4 @@ autodoc_mock_imports = ['amplify', 'dimod', 'dwave', 'matplotlib', 'numpy', 'pre
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = 'alabaster'
-html_static_path = ['_static']
+#html_static_path = ['_static']
