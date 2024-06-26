@@ -1,0 +1,14 @@
+name: doc
+
+on: push
+
+jobs:
+  generate_doc:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: build doc
+      run: |
+        pip install sphinx
+        sphinx-build -W -b html docs/ docs/build -j auto
+
