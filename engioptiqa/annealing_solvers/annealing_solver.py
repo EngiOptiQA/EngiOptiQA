@@ -2,10 +2,11 @@ from abc import ABC, abstractmethod
 
 class AnnealingSolver(ABC):
 
-    def __init__(self, token_file, proxy=None):
-       self.proxy = proxy
-       self.token = open(token_file,"r").read().replace('\n', '')
-       self.setup_client()
+    def __init__(self, token_file=None, proxy=None):
+        self.proxy = proxy
+        if token_file is not None:
+            self.token = open(token_file,"r").read().replace('\n', '')
+            self.setup_client()
 
     @abstractmethod
     def setup_client(self):
