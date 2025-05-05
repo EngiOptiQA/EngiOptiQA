@@ -417,8 +417,8 @@ class BaseProblem(ABC):
         elif results is None and hasattr(self, 'results'):
             results = self.results
 
-        self.errors_force_rel = [np.Inf for _ in range(len(results))]
-        solutions = [{'error_abs': np.Inf, 'energy': np.Inf} for _ in range(len(results))]
+        self.errors_force_rel = [np.inf for _ in range(len(results))]
+        solutions = [{'error_abs': np.inf, 'energy': np.inf} for _ in range(len(results))]
         solutions = [{} for _ in range(len(results))]
 
         self.errors_l2_rel = []
