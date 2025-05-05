@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 import os
-import tikzplotlib
+#import tikzplotlib
 
 from .rod_1d import Rod1D
 from .base_problem import BaseProblem
