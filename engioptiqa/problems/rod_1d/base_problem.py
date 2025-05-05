@@ -17,7 +17,7 @@ from prettytable import PrettyTable
 from scipy.integrate import quad
 import sympy as sp
 import sys
-import tikzplotlib
+#import tikzplotlib
 
 from engioptiqa.variables.real_number import RealNumber
 from .rod_1d import Rod1D
