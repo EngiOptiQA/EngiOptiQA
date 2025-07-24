@@ -6,7 +6,7 @@ from .annealing_solver import AnnealingSolver
 
 class AnnealingSolverDWave(AnnealingSolver):
 
-    def __init__(self, token_file, proxy=None):
+    def __init__(self, token_file=None, proxy=None):
         self.client_type = 'dwave'
         super().__init__(token_file, proxy)
 
