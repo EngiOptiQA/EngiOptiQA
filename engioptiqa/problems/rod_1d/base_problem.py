@@ -188,7 +188,10 @@ class BaseProblem(ABC):
         nf_polys = []
         for i_comp in range(self.rod.n_comp):
             q = self.symbol_generator.array(self.n_qubits_per_node)
-            nf_polys.append(self.real_number.evaluate(q, self.a_min[i_comp], self.a_max[i_comp]))
+            if binary_representation == 'range':
+                nf_polys.append(self.real_number.evaluate(q, self.a_min[i_comp], self.a_max[i_comp]))
+            else:
+                nf_polys.append(self.real_number.evaluate(q))
             if i_comp == self.rod.n_comp-1:
                 nf_polys.append(0.0)
         self.nf_polys = nf_polys
@@ -198,7 +201,10 @@ class BaseProblem(ABC):
         nf_polys = []
         for i_comp in range(self.rod.n_comp):
             q = self.symbol_generator.array(self.n_qubits_per_node)
-            nf_polys.append(self.real_number.evaluate(q, self.a_min[i_comp], self.a_max[i_comp]))
+            if self.binary_representation == 'range':
+                nf_polys.append(self.real_number.evaluate(q, self.a_min[i_comp], self.a_max[i_comp]))
+            else:
+                nf_polys.append(self.real_number.evaluate(q))
             if i_comp == self.rod.n_comp-1:
                 nf_polys.append(0.0)
         self.nf_polys = nf_polys

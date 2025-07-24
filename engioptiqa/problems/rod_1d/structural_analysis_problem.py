@@ -27,7 +27,7 @@ class StructuralAnalysisProblem(BaseProblem):
 
     def generate_discretization(self, n_qubits_per_node, binary_representation, lower_lim=None, upper_lim=None):
         BaseProblem.initialize_discretization(self)
-        BaseProblem.generate_nodal_force_polys(self, n_qubits_per_node, binary_representation,  lower_lim, upper_lim)
+        BaseProblem.generate_nodal_force_polys(self, n_qubits_per_node, binary_representation, lower_lim, upper_lim)
         self.generate_cross_section_inverse_polys()
 
     def generate_cross_section_inverse_polys(self):
