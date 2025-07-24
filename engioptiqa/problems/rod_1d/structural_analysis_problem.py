@@ -21,13 +21,13 @@ class StructuralAnalysisProblem(BaseProblem):
         self.stress_analytic = self.compute_stress_function(self.rod)
         self.force_analytic = self.compute_force_function(self.stress_analytic, self.rod)
         self.displacement_analytic = self.compute_displacement_function(self.stress_analytic, self.rod)
-        
+
         output = f'Analytic Force: {self.force_analytic}\n'
         self.print_and_log(output)
 
-    def generate_discretization(self, n_qubits_per_node, binary_representation):
+    def generate_discretization(self, n_qubits_per_node, binary_representation, lower_lim=None, upper_lim=None):
         BaseProblem.initialize_discretization(self)
-        BaseProblem.generate_nodal_force_polys(self, n_qubits_per_node, binary_representation)
+        BaseProblem.generate_nodal_force_polys(self, n_qubits_per_node, binary_representation,  lower_lim, upper_lim)
         self.generate_cross_section_inverse_polys()
 
     def generate_cross_section_inverse_polys(self):

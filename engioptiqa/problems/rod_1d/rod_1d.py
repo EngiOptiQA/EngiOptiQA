@@ -23,12 +23,12 @@ class Rod1D:
     def generate_coordinates(self):
         l_comp = [self.L/self.n_comp for _ in range(self.n_comp)]
         x = np.cumsum(l_comp)
-        x = np.insert(x,0,0)
+        x = np.insert(x,0,0.0)
 
         return x
-    
+
     def generate_young_modulus(self):
-        self.E = np.ones(self.n_comp) 
+        self.E = np.ones(self.n_comp)
 
     def generate_density(self):
         self.rho = np.ones(self.n_comp)

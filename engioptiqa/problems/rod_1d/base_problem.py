@@ -33,7 +33,7 @@ class BaseProblem(ABC):
         self.table = PrettyTable()
         self.table.field_names =\
             ['Cross Sections', 'Complementary Energy', 'Compliance']
-        
+
         self.quad_method = None
 
         if output_path is None:
@@ -56,11 +56,11 @@ class BaseProblem(ABC):
             print(f"Folder '{output_path}' already exists.")
         self.log_file = os.path.join(output_path,'log.txt')
         self.output_path = output_path
-        
+
         self.print_and_log(self.name+'\n')
 
     def analytical_complementary_energy_and_compliance(self, A_combi):
-        
+
         n_comp = self.rod.n_comp
         x = self.rod.x
         E = self.rod.E
@@ -73,20 +73,20 @@ class BaseProblem(ABC):
 
             A = A_combi[i_A_combi]
             tmp_rod_1d = Rod1D(n_comp, self.rod.L,A)
-            
-            # Stresses 
+
+            # Stresses
             stress = self.compute_stress_function(tmp_rod_1d)
-            
+
             # Displacement
             u = self.compute_displacement_function(stress, tmp_rod_1d)
-            
+
             # Complementary Energy
             PI_elem = []
             for i_comp in range(n_comp):
                 expr = A[i_comp]/E[i_comp] * stress[i_comp]**2
                 PI_elem.append(1./2. * sp.integrate(expr,(self.x_sym, x[i_comp], x[i_comp+1])))
             PI_combi.append(sum(PI_elem))
-            
+
             # Compliance
             C_elem = []
             for i_comp in range(n_comp):
@@ -94,7 +94,7 @@ class BaseProblem(ABC):
                 expr = stress[i_comp]/E[i_comp]
                 C_elem.append(A[i_comp]*sp.integrate(vol_force*u[i_comp], (self.x_sym, x[i_comp], x[i_comp+1])))
             C_combi.append(sum(C_elem))
-            
+
             # Sanity check.
             assert(round(C_combi[-1], 5) == round(2*PI_combi[-1], 5))
 
@@ -104,10 +104,10 @@ class BaseProblem(ABC):
             data.append({'Cross Sections': A_combi[i], \
                          'Complementary Energy': PI_combi[i], \
                          'Compliance': C_combi[i],})
-            
+
         for row in data:
             self.table.add_row([row['Cross Sections'], row['Complementary Energy'], row['Compliance']])
-        
+
         self.table.sortby = 'Complementary Energy'
 
         self.print_and_log(self.table.get_string()+'\n')
@@ -126,9 +126,9 @@ class BaseProblem(ABC):
         x = rod.x
         cs = rod.cross_sections
         rho = rod.rho
-        
+
         g = self.g
-        
+
         stress = []
         stress.append(rho[-1]*g*(x[-1]-self.x_sym))
         for i_comp in range(n_comp-2, -1, -1):
@@ -136,7 +136,7 @@ class BaseProblem(ABC):
         stress.reverse()
 
         return stress
-       
+
     def compute_force_function(self, stress, rod):
         n_comp = rod.n_comp
         cs = rod.cross_sections
@@ -144,7 +144,7 @@ class BaseProblem(ABC):
         force = []
         for i_comp in range(n_comp):
             force.append(stress[i_comp]*cs[i_comp])
-        
+
         return force
 
     def compute_displacement_function(self, stress, rod):
@@ -157,8 +157,8 @@ class BaseProblem(ABC):
         u.append(sp.integrate(stress[0]/E[0], self.x_sym))
         for i_comp in range(1, n_comp):
             expr = stress[i_comp]/E[i_comp]
-            u.append(u[-1].subs(self.x_sym, x[i_comp]) + sp.integrate(expr, (self.x_sym, x[i_comp], self.x_sym))) 
-        
+            u.append(u[-1].subs(self.x_sym, x[i_comp]) + sp.integrate(expr, (self.x_sym, x[i_comp], self.x_sym)))
+
         return u
 
     # Generate Basis Functions.
@@ -174,16 +174,31 @@ class BaseProblem(ABC):
     def generate_discretization():
         pass
 
-    def generate_nodal_force_polys(self, n_qubits_per_node, binary_representation):
+    def generate_nodal_force_polys(self, n_qubits_per_node, binary_representation, lower_lim=None, upper_lim=None):
         assert(self.symbol_generator is not None)
+        if binary_representation == 'range':
+            assert(lower_lim is not None and upper_lim is not None), \
+                "Lower and upper limits must be provided for range representation."
+            self.a_min = np.ones(self.rod.n_comp)*lower_lim
+            self.a_max = np.ones(self.rod.n_comp)*upper_lim
         self.n_qubits_per_node = n_qubits_per_node
         self.binary_representation = binary_representation
         self.real_number = RealNumber(self.n_qubits_per_node, self.binary_representation)
-        nf_polys = []
 
+        nf_polys = []
         for i_comp in range(self.rod.n_comp):
             q = self.symbol_generator.array(self.n_qubits_per_node)
-            nf_polys.append(self.real_number.evaluate(q))
+            nf_polys.append(self.real_number.evaluate(q, self.a_min[i_comp], self.a_max[i_comp]))
+            if i_comp == self.rod.n_comp-1:
+                nf_polys.append(0.0)
+        self.nf_polys = nf_polys
+
+    def update_nodal_force_polys(self):
+        self.initialize_discretization()
+        nf_polys = []
+        for i_comp in range(self.rod.n_comp):
+            q = self.symbol_generator.array(self.n_qubits_per_node)
+            nf_polys.append(self.real_number.evaluate(q, self.a_min[i_comp], self.a_max[i_comp]))
             if i_comp == self.rod.n_comp-1:
                 nf_polys.append(0.0)
         self.nf_polys = nf_polys
@@ -199,7 +214,7 @@ class BaseProblem(ABC):
             print('\t\tF'+str(i_comp)+' =', self.nf_polys[i_comp])
             print('\t\tF'+str(i_comp+1)+' =', self.nf_polys[i_comp+1])
             print('\tInverse of cross section area')
-            print('\t\tA'+str(i_comp)+'_inv = ',self.cs_inv_polys[i_comp])      
+            print('\t\tA'+str(i_comp)+'_inv = ',self.cs_inv_polys[i_comp])
 
     def complementary_energy(self, nf, cs_inv):
 
@@ -208,7 +223,7 @@ class BaseProblem(ABC):
             a1 = nf[i_comp]
             a2 = nf[i_comp+1]
             U_comp = cs_inv[i_comp]*(self.rod.x[i_comp+1]-self.rod.x[i_comp])/(6.0*self.rod.E[i_comp])*(a1**2+a1*a2+a2**2)
-            U.append(U_comp) 
+            U.append(U_comp)
         # External Complementary Work.
         V = [0 for _ in range(self.rod.n_comp)]
         # Total Complementary Energy.
@@ -221,12 +236,12 @@ class BaseProblem(ABC):
         cs_inv = self.cs_inv_polys
         x = self.rod.x
         E = self.rod.E
-        PI_poly = self.complementary_energy(nf, cs_inv) 
+        PI_poly = self.complementary_energy(nf, cs_inv)
 
-        self.complementary_energy_poly = PI_poly     
+        self.complementary_energy_poly = PI_poly
 
     def constraints(self, nf, cs_inv):
-        
+
         # Equilibrium.
         cons_eq = []
         for i_comp in range(self.rod.n_comp):
@@ -242,7 +257,7 @@ class BaseProblem(ABC):
             con_comp = eq**2
             cons_eq.append(con_comp)
 
-        cons_eq = sum(cons_eq)/self.rod.n_comp 
+        cons_eq = sum(cons_eq)/self.rod.n_comp
 
         # Traction Boundary Condition.
         traction_bc = 0.0
@@ -442,7 +457,7 @@ class BaseProblem(ABC):
             force_sol, stress_sol = self.symbolic_force_and_stress_functions(nf_sol, cs_inv_sol)
             # Compute error with respect to analytic solution.
             error_l2_force_abs, error_l2_force_rel = self.rel_error_l2(self.force_analytic, force_sol)
-            error_h1_force_abs, error_h1_force_rel = self.rel_error_h1(self.force_analytic, force_sol) 
+            error_h1_force_abs, error_h1_force_rel = self.rel_error_h1(self.force_analytic, force_sol)
             self.errors_force_rel[i_result] = error_l2_force_rel
             solutions[i_result]['force'] = force_sol
             solutions[i_result]['error_l2_abs'] = error_l2_force_abs
@@ -482,12 +497,12 @@ class BaseProblem(ABC):
                         file_name_force = None
                         file_name_stress = None
                         file_name_rod = None
-                    self.plot_force(self.force_analytic, force_sol, file_name=file_name_force, save_fig=self.save_fig) 
+                    self.plot_force(self.force_analytic, force_sol, file_name=file_name_force, save_fig=self.save_fig)
                     self.plot_stress(self.stress_analytic, stress_sol, file_name=file_name_stress, save_fig=self.save_fig)
                     rod_tmp = Rod1D(self.rod.n_comp, self.rod.L, 0.0)
                     rod_tmp.set_cross_sections_from_inverse(cs_inv_sol)
                     rod_tmp.visualize(file_name=file_name_rod, save_fig=self.save_fig)
-            
+
         output = 'Best solution (minimum objective):\n'
         i_min =np.argsort(self.objectives)
         i_sol = i_min[0]
@@ -532,7 +547,7 @@ class BaseProblem(ABC):
             output+= f'\tAbsolute Error = {error_force_abs:.15g}\n'
             output+= f'\tRelative Error = {error_force_rel:.15g}\n'
 
-            self.print_and_log(output)          
+            self.print_and_log(output)
 
     def decode_nodal_force_solution(self, result):
         nf_sol = []
@@ -586,7 +601,7 @@ class BaseProblem(ABC):
             xj = self.rod.x[i_comp+1]
             phi1, phi2 = self.basis(xi, xj, self.x_sym)
             force_fun.append(phi1*nf_sol[i_comp] + phi2*nf_sol[i_comp+1])
-        
+
         # Stress Function
         stress_fun = []
         for i_comp in range(self.rod.n_comp):
@@ -594,19 +609,19 @@ class BaseProblem(ABC):
         return force_fun, stress_fun
 
     def show_error_over_objective(self):
-        
+
         fig, ax1 = plt.subplots()
 
         ax1.set_xlabel('Objective')
         ax1.set_ylabel('Error')
-        ax1.set_yscale('log')  
-        ax1.set_xscale('log') 
+        ax1.set_yscale('log')
+        ax1.set_xscale('log')
         ax1.plot(self.objectives, self.errors_l2_rel, marker='*', color='tab:blue', linestyle='none', label='Error L2')
         ax1.plot(self.objectives, self.errors_h1_rel, marker='+', color='tab:orange', linestyle='none', label='Error H1')
 
-        ax2 = ax1.twinx()  
+        ax2 = ax1.twinx()
         ax2.plot(self.objectives, self.errors_comp_energy_rel, marker='o', color='tab:red', linestyle='none', label='Error Compl. Energy')
-        ax2.set_yscale('log') 
+        ax2.set_yscale('log')
         ax2.set_ylabel('Error Complementary Energy')
 
         fig.show()
@@ -618,16 +633,16 @@ class BaseProblem(ABC):
         force_analyt_plot = []
         plt.figure()
         for i_node in range(self.rod.n_comp+1):
-            plt.axvline(x=self.rod.x[i_node], color='gray', linestyle='--', linewidth=1.5)  
-            
+            plt.axvline(x=self.rod.x[i_node], color='gray', linestyle='--', linewidth=1.5)
+
         for i_comp in range(self.rod.n_comp):
             for i_x in np.linspace(self.rod.x[i_comp], self.rod.x[i_comp+1], 10):
                 x_plot.append(i_x)
                 force_num_plot.append(force_num[i_comp].subs(self.x_sym, i_x))
                 force_analyt_plot.append(force_analyt[i_comp].subs(self.x_sym, i_x))
 
-        plt.plot(x_plot, force_analyt_plot, 'k', label = "Analytical Solution") 
-        plt.plot(x_plot, force_num_plot, 'm', label = "Numerical Solution")   
+        plt.plot(x_plot, force_analyt_plot, 'k', label = "Analytical Solution")
+        plt.plot(x_plot, force_num_plot, 'm', label = "Numerical Solution")
 
         for i_comp in range(self.rod.n_comp):
             plt.plot(self.rod.x[i_comp], force_num[i_comp].subs(self.x_sym, self.rod.x[i_comp]),'mo')
@@ -639,7 +654,7 @@ class BaseProblem(ABC):
         else:
             plt.title(self.name)
 
-        plt.legend()        
+        plt.legend()
         if save_fig:
             plt.savefig(file_name, dpi=600)
         if save_tikz:
@@ -652,7 +667,7 @@ class BaseProblem(ABC):
         stresses_analyt_plot = []
         plt.figure()
         for i_node in range(self.rod.n_comp+1):
-            plt.axvline(x=self.rod.x[i_node], color='gray', linestyle='--', linewidth=1.5)  
+            plt.axvline(x=self.rod.x[i_node], color='gray', linestyle='--', linewidth=1.5)
 
         for i_comp in range(self.rod.n_comp):
             for i_x in np.linspace(self.rod.x[i_comp], self.rod.x[i_comp+1], 10):
@@ -660,8 +675,8 @@ class BaseProblem(ABC):
                 stresses_num_plot.append(stress_num[i_comp].subs(self.x_sym, i_x))
                 stresses_analyt_plot.append(stress_analyt[i_comp].subs(self.x_sym, i_x))
 
-        plt.plot(x_plot, stresses_analyt_plot, label = "Analytical Solution")  
-        plt.plot(x_plot, stresses_num_plot, label = "Numerical Solution") 
+        plt.plot(x_plot, stresses_analyt_plot, label = "Analytical Solution")
+        plt.plot(x_plot, stresses_num_plot, label = "Numerical Solution")
 
         for i_comp in range(self.rod.n_comp):
             plt.plot(self.rod.x[i_comp], stress_num[i_comp].subs(self.x_sym, self.rod.x[i_comp]),'mo')
@@ -673,7 +688,7 @@ class BaseProblem(ABC):
         else:
             plt.title(self.name)
 
-        plt.legend()        
+        plt.legend()
         if save_fig:
             plt.savefig(file_name, dpi=600)
         if save_tikz:
@@ -687,23 +702,23 @@ class BaseProblem(ABC):
             diff_fun = fun_analyt[i_comp] - fun_num[i_comp]
             quad_norm_diff_fun.append(
                 quad(
-                    lambda x_int: (diff_fun.subs(self.x_sym, x_int))**2, 
-                    self.rod.x[i_comp], 
+                    lambda x_int: (diff_fun.subs(self.x_sym, x_int))**2,
+                    self.rod.x[i_comp],
                     self.rod.x[i_comp+1]
                 )[0]
             )
             quad_norm_fun.append(
                 quad(
-                    lambda x_int: (fun_analyt[i_comp].subs(self.x_sym, x_int))**2, 
-                    self.rod.x[i_comp], 
+                    lambda x_int: (fun_analyt[i_comp].subs(self.x_sym, x_int))**2,
+                    self.rod.x[i_comp],
                     self.rod.x[i_comp+1]
                 )[0]
             )
         error_abs = np.sqrt(sum(quad_norm_diff_fun))
         error_rel = error_abs / np.sqrt(sum(quad_norm_fun))
 
-        return error_abs, error_rel   
-    
+        return error_abs, error_rel
+
     # Relative Error betweeen Analytical and Numerical Force-Solution.
     def rel_error_h1(self, fun_analyt, fun_num):
         quad_norm_diff_fun = []
@@ -714,35 +729,33 @@ class BaseProblem(ABC):
             d_fun_analyt_d_x = sp.diff(fun_analyt[i_comp])
             quad_norm_diff_fun.append(
                 quad(
-                    lambda x_int: (diff_fun.subs(self.x_sym, x_int))**2, 
-                    self.rod.x[i_comp], 
+                    lambda x_int: (diff_fun.subs(self.x_sym, x_int))**2,
+                    self.rod.x[i_comp],
                     self.rod.x[i_comp+1]
                 )[0]
                 +
                 quad(
-                    lambda x_int: (d_diff_fun_d_x.subs(self.x_sym, x_int))**2, 
-                    self.rod.x[i_comp], 
+                    lambda x_int: (d_diff_fun_d_x.subs(self.x_sym, x_int))**2,
+                    self.rod.x[i_comp],
                     self.rod.x[i_comp+1]
                 )[0]
 
             )
             quad_norm_fun.append(
                 quad(
-                    lambda x_int: (fun_analyt[i_comp].subs(self.x_sym, x_int))**2, 
-                    self.rod.x[i_comp], 
+                    lambda x_int: (fun_analyt[i_comp].subs(self.x_sym, x_int))**2,
+                    self.rod.x[i_comp],
                     self.rod.x[i_comp+1]
                 )[0]
                 +
                 quad(
-                    lambda x_int: (d_fun_analyt_d_x.subs(self.x_sym, x_int))**2, 
-                    self.rod.x[i_comp], 
+                    lambda x_int: (d_fun_analyt_d_x.subs(self.x_sym, x_int))**2,
+                    self.rod.x[i_comp],
                     self.rod.x[i_comp+1]
-                )[0]                
+                )[0]
 
             )
         error_abs = np.sqrt(sum(quad_norm_diff_fun))
         error_rel = error_abs / np.sqrt(sum(quad_norm_fun))
 
-        return error_abs, error_rel 
-
-   
+        return error_abs, error_rel

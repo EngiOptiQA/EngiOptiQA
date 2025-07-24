@@ -45,7 +45,7 @@ class DesignOptimizationProblem(BaseProblem):
         self.A_analytic = self.A_opt
         self.PI_analytic = self.PI_opt
         self.C_analytic = self.C_opt
-        
+
         self.rod_1d_opt = Rod1D(self.rod.n_comp,self.rod.L,0)
         self.rod_1d_opt.cross_sections = self.A_opt
         if self.output_path is not None:
@@ -60,9 +60,9 @@ class DesignOptimizationProblem(BaseProblem):
         output = f'Analytic Force: {self.force_analytic}\n'
         self.print_and_log(output)
 
-    def generate_discretization(self, n_qubits_per_node, binary_representation):
+    def generate_discretization(self, n_qubits_per_node, binary_representation, lower_lim=None, upper_lim=None):
         BaseProblem.initialize_discretization(self)
-        BaseProblem.generate_nodal_force_polys(self, n_qubits_per_node, binary_representation)
+        BaseProblem.generate_nodal_force_polys(self, n_qubits_per_node, binary_representation, lower_lim, upper_lim)
         self.generate_cross_section_inverse_polys()
 
     def generate_cross_section_inverse_polys(self):
@@ -107,7 +107,7 @@ class DesignOptimizationProblem(BaseProblem):
             pos = (i_node+1)*self.n_qubits_per_node - 0.5
             plt.axvline(x=pos, color='gray', linestyle='--', linewidth=0.75)
             plt.axhline(y=pos, color='gray', linestyle='--', linewidth=0.75)
-        
+
         pos = (self.rod.n_comp)*self.n_qubits_per_node + self.rod.n_comp - 0.5
         plt.axvline(x=pos, color='gray', linestyle='dotted', linewidth=0.75)
         plt.axhline(y=pos, color='gray', linestyle='dotted', linewidth=0.75)
@@ -127,11 +127,11 @@ class DesignOptimizationProblem(BaseProblem):
                 x_pos = self.rod.n_comp*self.n_qubits_per_node + i_comp - 0.5
                 y_pos = i_comp*self.n_qubits_per_node - 0.5
                 rect = patches.Rectangle(
-                    (x_pos,y_pos), 
-                    1, 
+                    (x_pos,y_pos),
+                    1,
                     2*self.n_qubits_per_node,
                     linewidth = 2,
-                    edgecolor='red', 
+                    edgecolor='red',
                     facecolor='none'
                 )
                 plt.gca().add_patch(rect)
@@ -141,11 +141,11 @@ class DesignOptimizationProblem(BaseProblem):
                 x_pos = self.rod.n_comp*self.n_qubits_per_node + (i_comp-1) - 0.5
                 y_pos = i_comp*self.n_qubits_per_node - 0.5
                 rect = patches.Rectangle(
-                    (x_pos,y_pos), 
-                    2, 
+                    (x_pos,y_pos),
+                    2,
                     self.n_qubits_per_node,
                     linewidth = 2,
-                    edgecolor='orange', 
+                    edgecolor='orange',
                     facecolor='none'
                 )
                 plt.gca().add_patch(rect)
