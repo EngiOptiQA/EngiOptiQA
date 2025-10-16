@@ -405,19 +405,15 @@ class BaseProblem(ABC):
             plt.show()
         plt.close()
 
-    def transform_to_dwave(self, lp_file_path):
-        save_lp(self.binary_quadratic_model, lp_file_path)
-        # Import as DWave constrained quadratic model (CQM)
-        cqm = lp.load(lp_file_path)
-        # Transform to DWave BQM
-        bqm = cqm_to_bqm(cqm)
-        # Set BQM problem that is solved by AnnealingSolverDWave
-        self.binary_quadratic_model_indices = BinaryQuadraticModelDWave(bqm[0])
+    def transform_to_dwave(self):
 
-        mapping_x_to_i = {}
-        for i_var in range(self.binary_quadratic_model_indices.num_variables):
-            mapping_x_to_i.update({f'x_{i_var}': i_var})
-        self.binary_quadratic_model_indices.relabel_variables(mapping_x_to_i, inplace=True)
+        coeff_dict = self.poly.asdict()
+        constant = coeff_dict.get((), 0.0)
+        linear = {k[0]: v for k, v in coeff_dict.items() if len(k) == 1}
+        quadratic = {tuple(k): v for k, v in coeff_dict.items() if len(k) == 2}
+
+        self.binary_quadratic_model_indices = BinaryQuadraticModelDWave(linear, quadratic, constant, vartype='BINARY')
+
 
     def get_energy(self, index):
         if type(self.results) is SampleSet:
