@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 import os
-import tikzplotlib
+import matplot2tikz
 
 from .rod_1d import Rod1D
 from .base_problem import BaseProblem
@@ -99,7 +99,7 @@ class DesignOptimizationProblem(BaseProblem):
             if save_fig:
                 plt.savefig(file_name, dpi=600)
             if save_tikz:
-                tikzplotlib.save(file_name + '.tex')
+                matplot2tikz.save(file_name + '.tex')
         plt.close()
 
     def annotate_qubo_matrix_pattern(self):
@@ -162,5 +162,5 @@ class DesignOptimizationProblem(BaseProblem):
             if save_fig:
                 plt.savefig(file_name, dpi=600)
             if save_tikz:
-                tikzplotlib.save(file_name + '.tex')
+                matplot2tikz.save(file_name + '.tex')
         plt.close()
