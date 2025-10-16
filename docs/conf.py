@@ -22,7 +22,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
-autodoc_mock_imports = ['amplify', 'dimod', 'dwave', 'matplotlib', 'numpy', 'prettytable', 'scipy', 'sympy','tikzplotlib']
+autodoc_mock_imports = ['amplify', 'dimod', 'dwave', 'matplotlib', 'numpy', 'prettytable', 'scipy', 'sympy','matplot2tikz']
 
 
 # -- Options for HTML output -------------------------------------------------
