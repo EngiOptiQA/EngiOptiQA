@@ -8,6 +8,7 @@ from dimod import BinaryQuadraticModel as BinaryQuadraticModelDWave
 from dimod import cqm_to_bqm, lp
 from dimod.views.samples import SampleView
 from dimod.sampleset import SampleSet
+import matplot2tikz
 from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
@@ -17,7 +18,6 @@ from prettytable import PrettyTable
 from scipy.integrate import quad
 import sympy as sp
 import sys
-import tikzplotlib
 
 from engioptiqa.variables.real_number import RealNumber
 from .rod_1d import Rod1D
@@ -350,7 +350,7 @@ class BaseProblem(ABC):
             if save_fig:
                 plt.savefig(file_name, dpi=600)
             if save_tikz:
-                tikzplotlib.save(file_name + '.tex')
+                matplot2tikz.save(file_name + '.tex')
         plt.close()
 
     def plot_qubo_matrix_pattern(self, highlight_nodes=False, highlight_interactions=False):
@@ -400,7 +400,7 @@ class BaseProblem(ABC):
             if save_fig:
                 plt.savefig(file_name, dpi=600)
             if save_tikz:
-                tikzplotlib.save(file_name + '.tex')
+                matplot2tikz.save(file_name + '.tex')
         if show_fig:
             plt.show()
         plt.close()
@@ -659,7 +659,7 @@ class BaseProblem(ABC):
         if save_fig:
             plt.savefig(file_name, dpi=600)
         if save_tikz:
-            tikzplotlib.save(file_name+".tex")
+            matplot2tikz.save(file_name+".tex")
 
     # Plot Stress Solutions.
     def plot_stress(self, stress_analyt, stress_num, subtitle=None, file_name=None, save_fig=False, save_tikz=False):
@@ -693,7 +693,7 @@ class BaseProblem(ABC):
         if save_fig:
             plt.savefig(file_name, dpi=600)
         if save_tikz:
-            tikzplotlib.save(file_name+".tex")
+            matplot2tikz.save(file_name+".tex")
 
     # Relative Error betweeen Analytical and Numerical Force-Solution.
     def rel_error_l2(self, fun_analyt, fun_num):
