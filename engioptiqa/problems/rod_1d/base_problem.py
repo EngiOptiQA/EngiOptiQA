@@ -407,13 +407,12 @@ class BaseProblem(ABC):
 
     def transform_to_dwave(self):
 
-        coeff_dict = self.poly.asdict()
+        coeff_dict = self.binary_quadratic_model.logical_poly.asdict()
         constant = coeff_dict.get((), 0.0)
         linear = {k[0]: v for k, v in coeff_dict.items() if len(k) == 1}
         quadratic = {tuple(k): v for k, v in coeff_dict.items() if len(k) == 2}
 
         self.binary_quadratic_model_indices = BinaryQuadraticModelDWave(linear, quadratic, constant, vartype='BINARY')
-
 
     def get_energy(self, index):
         if type(self.results) is SampleSet:
