@@ -66,11 +66,11 @@ class DesignOptimizationProblem(BaseProblem):
         self.generate_cross_section_inverse_polys()
 
     def generate_cross_section_inverse_polys(self):
-        assert(self.symbol_generator is not None)
+        assert(self.variable_generator is not None)
         cs_inv_polys = []
 
         for _ in range(self.rod.n_comp):
-            q = self.symbol_generator.array(1)
+            q = self.variable_generator.array("Binary", 1)
             cs_inv_polys.append(1./self.A_choice[0] + (1./self.A_choice[1]-1./self.A_choice[0])*q[0])
         self.cs_inv_polys = cs_inv_polys
 

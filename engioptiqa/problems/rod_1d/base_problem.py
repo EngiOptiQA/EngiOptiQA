@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
 from amplify import (
-    BinaryPoly,
+    AcceptableDegrees,
     BinaryQuadraticModel,
-    save_lp,
-    SymbolGenerator)
+    Model,
+    Poly,
+    VariableGenerator)
 from dimod import BinaryQuadraticModel as BinaryQuadraticModelDWave
 from dimod import cqm_to_bqm, lp
 from dimod.views.samples import SampleView
@@ -168,14 +169,14 @@ class BaseProblem(ABC):
         return phi1, phi2
 
     def initialize_discretization(self):
-        self.symbol_generator = SymbolGenerator(BinaryPoly)
+        self.variable_generator = VariableGenerator()
 
     @abstractmethod
     def generate_discretization():
         pass
 
     def generate_nodal_force_polys(self, n_qubits_per_node, binary_representation, lower_lim=None, upper_lim=None):
-        assert(self.symbol_generator is not None)
+        assert(self.variable_generator is not None)
         if binary_representation == 'range':
             assert(lower_lim is not None and upper_lim is not None), \
                 "Lower and upper limits must be provided for range representation."
@@ -187,7 +188,7 @@ class BaseProblem(ABC):
 
         nf_polys = []
         for i_comp in range(self.rod.n_comp):
-            q = self.symbol_generator.array(self.n_qubits_per_node)
+            q = self.variable_generator.array("Binary", self.n_qubits_per_node)
             if binary_representation == 'range':
                 nf_polys.append(self.real_number.evaluate(q, self.a_min[i_comp], self.a_max[i_comp]))
             else:
@@ -200,7 +201,7 @@ class BaseProblem(ABC):
         self.initialize_discretization()
         nf_polys = []
         for i_comp in range(self.rod.n_comp):
-            q = self.symbol_generator.array(self.n_qubits_per_node)
+            q = self.variable_generator.array("Binary", self.n_qubits_per_node)
             if self.binary_representation == 'range':
                 nf_polys.append(self.real_number.evaluate(q, self.a_min[i_comp], self.a_max[i_comp]))
             else:
@@ -284,15 +285,11 @@ class BaseProblem(ABC):
         self.generate_complementary_energy_poly()
         self.generate_constraint_polys()
 
-        if self.quad_method is not None:
-            PI_quadratic_model = BinaryQuadraticModel(self.complementary_energy_poly, method=self.quad_method)
-            constraints_quadratic_model = BinaryQuadraticModel(self.equilibrium_constraint_poly, method=self.quad_method)
-        else:
-            PI_quadratic_model = BinaryQuadraticModel(self.complementary_energy_poly)
-            constraints_quadratic_model = BinaryQuadraticModel(self.equilibrium_constraint_poly)
+        PI_quadratic_model = Model(self.complementary_energy_poly)
+        constraints_quadratic_model = Model(self.equilibrium_constraint_poly)
 
-        self.PI_qubo_matrix, self.PI_QUBO_const = PI_quadratic_model.logical_matrix
-        self.constraints_qubo_matrix, self.constraints_QUBO_const = constraints_quadratic_model.logical_matrix
+        # self.PI_qubo_matrix, self.PI_QUBO_const = PI_quadratic_model.logical_matrix
+        # self.constraints_qubo_matrix, self.constraints_QUBO_const = constraints_quadratic_model.logical_matrix
 
         # TODO Scaling
         # PI_abs = np.abs(self.PI_qubo_matrix.to_numpy())
@@ -318,10 +315,12 @@ class BaseProblem(ABC):
         else:
             self.binary_quadratic_model = BinaryQuadraticModel(self.poly)
 
-        self.qubo_matrix, self.PI_QUBO_const = self.binary_quadratic_model.logical_matrix
+        self.binary_quadratic_model = Model(self.poly)
 
-        output = f'Number of input qubits: {self.binary_quadratic_model.num_input_vars}\n'
-        output+= f'Number of logical qubits: {self.binary_quadratic_model.num_logical_vars}\n'
+        # self.qubo_matrix, self.PI_QUBO_const = self.binary_quadratic_model.logical_matrix
+
+
+        output = f'Number of input qubits: {len(self.binary_quadratic_model.get_variables())}\n'
         self.print_and_log(output)
 
     def update_penalty_weight_in_qubo_formulation(self, penalty_weight = 1.0):
@@ -407,7 +406,13 @@ class BaseProblem(ABC):
 
     def transform_to_dwave(self):
 
-        coeff_dict = self.binary_quadratic_model.logical_poly.asdict()
+        bq = AcceptableDegrees(objective={"Binary": "Quadratic"})
+        im, mapping =  self.binary_quadratic_model.to_intermediate_model(bq)
+
+        output = f'Number of input qubits: {len(self.binary_quadratic_model.get_variables())}\n'
+        output+= f'Number of logical qubits: {len(im.get_variables())}\n'
+        self.print_and_log(output)
+        coeff_dict = im.objective.asdict()
         constant = coeff_dict.get((), 0.0)
         linear = {k[0]: v for k, v in coeff_dict.items() if len(k) == 1}
         quadratic = {tuple(k): v for k, v in coeff_dict.items() if len(k) == 2}
@@ -550,13 +555,26 @@ class BaseProblem(ABC):
 
             self.print_and_log(output)
 
+    def decode_amplify_poly_with_bitstring(self, amplify_poly, bitstring):
+
+        poly_dict = amplify_poly.as_dict()
+        value = 0.0
+        for vars_tuple, coeff in poly_dict.items():
+            if len(vars_tuple) == 0:
+                # Constant term
+                term_value = coeff
+            else:
+                # Product of variables in the tuple
+                term_value = coeff * np.prod([bitstring[i] for i in vars_tuple])
+            value += term_value
+        return float(value)
+
     def decode_nodal_force_solution(self, result):
         nf_sol = []
         for nf_poly in self.nf_polys:
-            if type(nf_poly) is BinaryPoly:
+            if type(nf_poly) is Poly:
                 if type(result) is SampleView:
-                    result_tmp = [int(x) for x in result._data]
-                    nf_sol.append(nf_poly.decode(result_tmp))
+                    nf_sol.append(self.decode_amplify_poly_with_bitstring(nf_poly,result._data))
                 else:
                     nf_sol.append(nf_poly.decode(result.values))
             elif type(nf_poly) in [float, np.float64]:
@@ -570,10 +588,9 @@ class BaseProblem(ABC):
 
         cs_inv_sol = []
         for cs_inv_poly in self.cs_inv_polys:
-            if type(cs_inv_poly) is BinaryPoly:
+            if type(cs_inv_poly) is Poly:
                 if type(result) is SampleView:
-                    result_tmp = [int(x) for x in result._data]
-                    cs_inv_sol.append(cs_inv_poly.decode(result_tmp))
+                    cs_inv_sol.append(self.decode_amplify_poly_with_bitstring(cs_inv_poly,result._data))
                 else:
                     cs_inv_sol.append(cs_inv_poly.decode(result.values))
             elif type(cs_inv_poly) in [float, np.float64]:
