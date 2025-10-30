@@ -35,8 +35,6 @@ class BaseProblem(ABC):
         self.table.field_names =\
             ['Cross Sections', 'Complementary Energy', 'Compliance']
 
-        self.quad_method = None
-
         if output_path is None:
             self.save_fig = False
         else:
@@ -309,12 +307,6 @@ class BaseProblem(ABC):
         self.poly = self.complementary_energy_poly + \
             self.penalty_weight_equilibrium * self.equilibrium_constraint_poly
 
-        if self.quad_method is not None:
-            print(self.quad_method)
-            self.binary_quadratic_model = BinaryQuadraticModel(self.poly, method=self.quad_method)
-        else:
-            self.binary_quadratic_model = BinaryQuadraticModel(self.poly)
-
         self.binary_quadratic_model = Model(self.poly)
 
         # self.qubo_matrix, self.PI_QUBO_const = self.binary_quadratic_model.logical_matrix
@@ -328,10 +320,8 @@ class BaseProblem(ABC):
         print(f"Effective penalty weight: {self.penalty_weight_equilibrium}\n")
         self.poly = self.complementary_energy_poly + \
             self.penalty_weight_equilibrium * self.equilibrium_constraint_poly
-        if self.quad_method is not None:
-            self.binary_quadratic_model = BinaryQuadraticModel(self.poly, method=self.quad_method)
-        else:
-            self.binary_quadratic_model = BinaryQuadraticModel(self.poly)
+
+        self.binary_quadratic_model = Model(self.poly)
 
     def visualize_qubo_matrix(self, show_fig=False, save_fig=False, save_tikz=False, suffix=''):
         title = self.name + '\n QUBO Matrix \n'

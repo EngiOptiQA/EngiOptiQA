@@ -19,7 +19,6 @@ class DesignOptimizationProblem(BaseProblem):
         self.name = 'Design Optimization Problem'
         self.print_and_log(self.name+'\n')
 
-
     def analytical_complementary_energy_and_compliance(self):
         A_combi = list(itertools.product([self.A_choice[0], self.A_choice[1]], repeat=self.rod.n_comp))
         super().analytical_complementary_energy_and_compliance(A_combi)
@@ -73,20 +72,6 @@ class DesignOptimizationProblem(BaseProblem):
             q = self.variable_generator.array("Binary", 1)
             cs_inv_polys.append(1./self.A_choice[0] + (1./self.A_choice[1]-1./self.A_choice[0])*q[0])
         self.cs_inv_polys = cs_inv_polys
-
-    def set_quad_method(self,quad_method_name):
-        self.quad_method_name = quad_method_name
-        match quad_method_name:
-            case 'ISHIKAWA':
-                self.quad_method = QuadratizationMethod.ISHIKAWA
-            case 'ISHIKAWA_KZFD':
-                self.quad_method = QuadratizationMethod.ISHIKAWA_KZFD
-            case 'SUBSTITUTION':
-                self.quad_method = QuadratizationMethod.SUBSTITUTION
-            case 'SUBSTITUTION_KZFD':
-                self.quad_method = QuadratizationMethod.SUBSTITUTION_KZFD
-            case _ :
-                raise Exception('Unknown quad_method', quad_method_name)
 
     def visualize_qubo_matrix_pattern(self, show_fig=False, save_fig=False, save_tikz=False, suffix=''):
         self.plot_qubo_matrix_pattern()
