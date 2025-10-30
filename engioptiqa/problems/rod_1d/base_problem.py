@@ -323,13 +323,49 @@ class BaseProblem(ABC):
 
         self.binary_quadratic_model = Model(self.poly)
 
+    def get_qubo_matrix(self):
+        bq = AcceptableDegrees(objective={"Binary": "Quadratic"})
+        im, mapping =  self.binary_quadratic_model.to_intermediate_model(bq)
+        coeff_dict = im.objective.asdict()
+
+        # 1. Determine the number of variables
+        variable_keys = [k for k in coeff_dict.keys() if k]  # remove empty tuple
+        n = max(max(k) for k in variable_keys) + 1 if variable_keys else 0
+
+        # 2. Initialize an NxN matrix of zeros
+        Q = np.zeros((n, n))
+
+        # 3. Fill the matrix
+        for key, value in coeff_dict.items():
+            if key == ():
+                # constant offset, ignore in the matrix
+                continue
+            elif len(key) == 1:
+                # Linear term
+                i = key[0]
+                Q[i, i] = value
+            elif len(key) == 2:
+                # Quadratic term
+                i, j = key
+                Q[i, j] = value
+                Q[j, i] = value  # make it symmetric
+            else:
+                raise ValueError(f"Unexpected key format in dictionary with QUBO coefficients: {key}")
+
+        return Q
+
     def visualize_qubo_matrix(self, show_fig=False, save_fig=False, save_tikz=False, suffix=''):
         title = self.name + '\n QUBO Matrix \n'
+
+        print("Generating QUBO matrix for visualization...")
+
+        Q = self.get_qubo_matrix()
 
         # Visualize the QUBO Matrix.
         plt.figure()
         plt.suptitle(title)
-        plt.imshow(self.qubo_matrix.to_numpy(),interpolation='none')
+        # plt.imshow(self.qubo_matrix.to_numpy(),interpolation='none')
+        plt.imshow(Q,interpolation='none')
         plt.colorbar()
         if show_fig:
             plt.show()
@@ -344,7 +380,8 @@ class BaseProblem(ABC):
 
     def plot_qubo_matrix_pattern(self, highlight_nodes=False, highlight_interactions=False):
         title = self.name + '\n QUBO Pattern \n'
-        binary_matrix = np.where(self.qubo_matrix.to_numpy() != 0, 1, 0)
+        Q = self.get_qubo_matrix()
+        binary_matrix = np.where(Q != 0, 1, 0)
         plt.figure()
         plt.suptitle(title)
         plt.imshow(binary_matrix,cmap='gray_r')
