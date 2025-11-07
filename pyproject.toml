@@ -3,7 +3,7 @@ requires = ["setuptools>=80", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "engioptiqa_test"
+name = "engioptiqa"
 description = "Engineering Optimization with Quantum Annealing"
 readme = "README.md"
 authors = [
