@@ -1,5 +1,6 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10222617.svg)](https://doi.org/10.5281/zenodo.10222617)
 [![Test Examples](https://github.com/EngiOptiQA/EngiOptiQA/actions/workflows/test_examples.yml/badge.svg)](https://github.com/EngiOptiQA/EngiOptiQA/actions/workflows/test_examples.yml)
+[![PyPI - Version](https://img.shields.io/pypi/v/engioptiqa)](https://pypi.org/project/engioptiqa/)
 
 # EngiOptiQA: Engineering Optimization with Quantum Annealing
 
