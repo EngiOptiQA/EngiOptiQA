@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=80", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "engioptiqa_test"
+description = "Engineering Optimization with Quantum Annealing"
+readme = "README.md"
+authors = [
+    {name = "Fabian Key", email = "fabian.key@tuwien.ac.at"}
+]
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+    "amplify[extra]==1.4.0",
+    "dwave-cloud-client==0.14.0",
+    "dwave-samplers==1.6.0",
+    "dwave-system==1.33.0",
+    "matplot2tikz==0.4.2",
+    "matplotlib==3.10.7",
+    "numpy==2.2.6",
+    "prettytable==3.16.0",
+    "sympy==1.14.0"
+]
+dynamic = ["version"]
+
+[tool.setuptools_scm]
+version_scheme = "post-release"
+local_scheme = "node-and-date"
+
+[project.urls]
+Homepage = "https://github.com/EngiOptiQA/EngiOptiQA"
+Documentation = "https://engioptiqa.github.io/EngiOptiQA/"

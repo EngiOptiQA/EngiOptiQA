@@ -1,2 +1,17 @@
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
 **/__pycache__/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# Test examples
 examples/rod_1d/results/
