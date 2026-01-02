@@ -31,6 +31,10 @@ The expected $H_1$ error for the best solution is approximately $1.59 \times 10^
 H1 Error 0.015873015873015817 0.015873015873015817
 ```
 
+## Funding
+
+This research was funded in whole or in part by the Austrian Science Fund (FWF) [10.55776/ESP2444325](https://doi.org/10.55776/ESP2444325).
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
