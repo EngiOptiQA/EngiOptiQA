@@ -446,6 +446,13 @@ class BaseProblem(ABC):
 
         self.binary_quadratic_model_indices = BinaryQuadraticModelDWave(linear, quadratic, constant, vartype='BINARY')
 
+    def get_bit_array(self, result):
+        if type(result) is SampleView:
+            bit_array = [int(result[k]) for k in result.keys()]
+        else:
+            bit_array = [int(result.values[k]) for k in result.values.keys()]
+        return bit_array
+
     def get_energy(self, index):
         if type(self.results) is SampleSet:
             return self.results.record[index]['energy']
@@ -477,6 +484,7 @@ class BaseProblem(ABC):
         self.cs_inv =[]
         self.cs = []
         for i_result, result in enumerate(results):
+            bit_array = self.get_bit_array(result)
             # Decode solution, i.e., evaluate nodal forces and inverse of cross sections.
             nf_sol = self.decode_nodal_force_solution(result)
             cs_inv_sol = self.decode_cross_section_inverse_solution(result)
@@ -492,6 +500,8 @@ class BaseProblem(ABC):
             error_l2_force_abs, error_l2_force_rel = self.rel_error_l2(self.force_analytic, force_sol)
             error_h1_force_abs, error_h1_force_rel = self.rel_error_h1(self.force_analytic, force_sol)
             self.errors_force_rel[i_result] = error_l2_force_rel
+
+            solutions[i_result]['bit_array'] = bit_array
             solutions[i_result]['force'] = force_sol
             solutions[i_result]['error_l2_abs'] = error_l2_force_abs
             solutions[i_result]['error_l2_rel'] = error_l2_force_rel
