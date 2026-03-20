@@ -1,6 +1,7 @@
-from amplify import Solver
+from amplify import solve, Solver, ToshibaSQBM2Client
 from amplify.client import FixstarsClient
 from amplify.client.ocean import DWaveSamplerClient, LeapHybridSamplerClient
+from datetime import timedelta
 
 from .annealing_solver import AnnealingSolver
 
@@ -24,6 +25,8 @@ class AnnealingSolverAmplify(AnnealingSolver):
             self.client = DWaveSamplerClient(token=self.token)
         elif self.client_type == 'dwave_hybrid':
             self.client = LeapHybridSamplerClient(token=self.token)
+        elif self.client_type == 'toshiba':
+            self.client = ToshibaSQBM2Client(token=self.token)
         else:
             raise Exception('Unknown client type', self.client_type)
         if self.proxy:
@@ -31,7 +34,7 @@ class AnnealingSolverAmplify(AnnealingSolver):
         if self.client_type in ['dwave','dwave_hybrid']:
             print('Available solvers:', self.client.solver_names)
 
-    
+
     def setup_solver(self):
 
         if self.client_type == 'fixstars':
@@ -41,15 +44,18 @@ class AnnealingSolverAmplify(AnnealingSolver):
             print('Choosing default solver: Advantage_system4.1')
             self.client.solver = "Advantage_system4.1"
             print('Setting default num_reads: 200')
-            self.client.parameters.num_reads = 200 
+            self.client.parameters.num_reads = 200
         elif self.client_type == 'dwave_hybrid':
             print('Choosing default solver: hybrid_binary_quadratic_model_version2')
             self.client.solver = 'hybrid_binary_quadratic_model_version2'
+        elif self.client_type == 'toshiba':
+            print('Choosing default solver: Pubo')
+            self.client.solver = "Pubo"
+            print('Setting default timeout (ms): 1000')
+            self.client.parameters.timeout = timedelta(milliseconds=1000)
 
-        self.solver = Solver(self.client)
         print("Created solver")
 
     def solve_qubo_problem(self, problem):
-        
-        problem.results = self.solver.solve(problem.binary_quadratic_model)
+        problem.results = solve(problem.binary_quadratic_model, self.client)
         print('Number of solutions:', len(problem.results))
