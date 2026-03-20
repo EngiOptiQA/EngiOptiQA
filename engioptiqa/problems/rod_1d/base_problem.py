@@ -457,13 +457,19 @@ class BaseProblem(ABC):
         if type(self.results) is SampleSet:
             return self.results.record[index]['energy']
         else:
-            return self.results[index].energy
+            if hasattr(self.results[index], 'energy'):
+                return self.results[index].energy
+            else:
+                return np.nan
 
     def get_frequency(self, index):
         if type(self.results) is SampleSet:
             return self.results.record[index]['num_occurrences']
         else:
-            return self.results[index].frequency
+            if hasattr(self.results[index], 'frequency'):
+                return self.results[index].frequency
+            else:
+                return np.nan
 
     def analyze_results(self, results=None, analysis_plots=True, result_max=sys.maxsize):
 
