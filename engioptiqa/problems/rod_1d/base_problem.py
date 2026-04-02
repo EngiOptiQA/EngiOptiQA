@@ -479,8 +479,7 @@ class BaseProblem(ABC):
         elif results is None and hasattr(self, 'results'):
             results = self.results
 
-        if analysis_plots == True and compute_errors == False:
-            raise Exception('Analysis plots require error computation to be enabled.')
+        compute_symbolic_functions = analysis_plots or compute_errors
 
         self.errors_force_rel = [np.inf for _ in range(len(results))]
         solutions = [{'error_abs': np.inf, 'energy': np.inf} for _ in range(len(results))]
@@ -520,15 +519,16 @@ class BaseProblem(ABC):
             self.cs_inv.append(cs_inv_sol)
             self.cs.append([1/cs_inv for cs_inv in cs_inv_sol])
 
-            if compute_errors:
+            if compute_symbolic_functions:
                 # Compute symbolic force and stress functions.
                 force_sol, stress_sol = self.symbolic_force_and_stress_functions(nf_sol, cs_inv_sol)
+                solutions[i_result]['force'] = force_sol
+            if compute_errors:
                 # Compute error with respect to analytic solution.
                 error_l2_force_abs, error_l2_force_rel = self.rel_error_l2(self.force_analytic, force_sol)
                 error_h1_force_abs, error_h1_force_rel = self.rel_error_h1(self.force_analytic, force_sol)
 
                 self.errors_force_rel[i_result] = error_l2_force_rel
-                solutions[i_result]['force'] = force_sol
                 solutions[i_result]['error_l2_abs'] = error_l2_force_abs
                 solutions[i_result]['error_l2_rel'] = error_l2_force_rel
                 solutions[i_result]['error_h1_abs'] = error_h1_force_abs
