@@ -23,6 +23,7 @@ import sys
 from engioptiqa.variables.real_number import RealNumber
 from .rod_1d import Rod1D
 from ..solution_emulator import SolutionEmulator
+from types import SimpleNamespace
 
 class BaseProblem(ABC):
     def __init__(self, rod, g, output_path=None):
@@ -471,12 +472,15 @@ class BaseProblem(ABC):
             else:
                 return np.nan
 
-    def analyze_results(self, results=None, analysis_plots=True, result_max=sys.maxsize):
+    def analyze_results(self, results=None, analysis_plots=True, compute_errors=True, result_max=sys.maxsize):
 
         if results is None and not hasattr(self, 'results'):
             raise Exception('Attempt to analyze results, but no results exist or have been passed.')
         elif results is None and hasattr(self, 'results'):
             results = self.results
+
+        if analysis_plots == True and compute_errors == False:
+            raise Exception('Analysis plots require error computation to be enabled.')
 
         self.errors_force_rel = [np.inf for _ in range(len(results))]
         solutions = [{'error_abs': np.inf, 'energy': np.inf} for _ in range(len(results))]
@@ -500,19 +504,8 @@ class BaseProblem(ABC):
             con_eq_sol, con_bc_sol = self.constraints(nf_sol, cs_inv_sol)
             # Compute objective function.
             obj_sol = PI_sol + self.penalty_weight_equilibrium*con_eq_sol + 0.0*con_bc_sol
-            # Compute symbolic force and stress functions.
-            force_sol, stress_sol = self.symbolic_force_and_stress_functions(nf_sol, cs_inv_sol)
-            # Compute error with respect to analytic solution.
-            error_l2_force_abs, error_l2_force_rel = self.rel_error_l2(self.force_analytic, force_sol)
-            error_h1_force_abs, error_h1_force_rel = self.rel_error_h1(self.force_analytic, force_sol)
-            self.errors_force_rel[i_result] = error_l2_force_rel
 
             solutions[i_result]['bit_array'] = bit_array
-            solutions[i_result]['force'] = force_sol
-            solutions[i_result]['error_l2_abs'] = error_l2_force_abs
-            solutions[i_result]['error_l2_rel'] = error_l2_force_rel
-            solutions[i_result]['error_h1_abs'] = error_h1_force_abs
-            solutions[i_result]['error_h1_rel'] = error_h1_force_rel
             solutions[i_result]['complementary_energy'] = PI_sol
             solutions[i_result]['constraints'] = con_eq_sol
             solutions[i_result]['objective'] = obj_sol
@@ -521,13 +514,28 @@ class BaseProblem(ABC):
             solutions[i_result]['nf'] = nf_sol
             solutions[i_result]['cs_inv'] = cs_inv_sol
 
-            self.errors_l2_rel.append(error_l2_force_rel)
-            self.errors_h1_rel.append(error_h1_force_rel)
             self.objectives.append(obj_sol)
             self.comp_energies.append(PI_sol)
             self.errors_comp_energy_rel.append(abs(PI_sol-self.PI_analytic)/abs(self.PI_analytic))
             self.cs_inv.append(cs_inv_sol)
             self.cs.append([1/cs_inv for cs_inv in cs_inv_sol])
+
+            if compute_errors:
+                # Compute symbolic force and stress functions.
+                force_sol, stress_sol = self.symbolic_force_and_stress_functions(nf_sol, cs_inv_sol)
+                # Compute error with respect to analytic solution.
+                error_l2_force_abs, error_l2_force_rel = self.rel_error_l2(self.force_analytic, force_sol)
+                error_h1_force_abs, error_h1_force_rel = self.rel_error_h1(self.force_analytic, force_sol)
+
+                self.errors_force_rel[i_result] = error_l2_force_rel
+                solutions[i_result]['force'] = force_sol
+                solutions[i_result]['error_l2_abs'] = error_l2_force_abs
+                solutions[i_result]['error_l2_rel'] = error_l2_force_rel
+                solutions[i_result]['error_h1_abs'] = error_h1_force_abs
+                solutions[i_result]['error_h1_rel'] = error_h1_force_rel
+
+                self.errors_l2_rel.append(error_l2_force_rel)
+                self.errors_h1_rel.append(error_h1_force_rel)
 
             # Output of analysis.
             if i_result < result_max:
@@ -535,7 +543,8 @@ class BaseProblem(ABC):
                 output+= f"\tenergy = {solutions[i_result]['energy']}, frequency = {solutions[i_result]['frequency']}\n"
                 self.print_and_log(output)
                 self.print_nodal_force_and_cross_section_inverse(nf_sol, cs_inv_sol)
-                self.print_solution_quantities(PI_sol, con_eq_sol, con_bc_sol, obj_sol, error_l2_force_abs, error_l2_force_rel)
+                if compute_errors:
+                    self.print_solution_quantities(PI_sol, con_eq_sol, con_bc_sol, obj_sol, error_l2_force_abs, error_l2_force_rel)
                 # Plot Solution
                 if analysis_plots:
                     if self.output_path is not None:
@@ -555,9 +564,10 @@ class BaseProblem(ABC):
         output = 'Best solution (minimum objective):\n'
         i_min =np.argsort(self.objectives)
         i_sol = i_min[0]
-        error_l2 = solutions[i_sol]['error_l2_rel']
-        error_h1 = solutions[i_sol]['error_h1_rel']
-        output += f'L2 Error {error_l2} {self.errors_l2_rel[i_sol]}\nH1 Error {error_h1} {self.errors_h1_rel[i_sol]}\n'
+        if compute_errors:
+            error_l2 = solutions[i_sol]['error_l2_rel']
+            error_h1 = solutions[i_sol]['error_h1_rel']
+            output += f'L2 Error {error_l2} {self.errors_l2_rel[i_sol]}\nH1 Error {error_h1} {self.errors_h1_rel[i_sol]}\n'
         self.print_and_log(output)
 
         return solutions
@@ -618,6 +628,8 @@ class BaseProblem(ABC):
             if type(nf_poly) is Poly:
                 if type(result) is SampleView:
                     nf_sol.append(self.decode_amplify_poly_with_bitstring(nf_poly,result._data))
+                elif type(result) is SimpleNamespace:
+                    nf_sol.append(self.decode_amplify_poly_with_bitstring(nf_poly,result.values))
                 else:
                     nf_sol.append(nf_poly.decode(result.values))
             elif type(nf_poly) in [float, np.float64]:
@@ -634,6 +646,8 @@ class BaseProblem(ABC):
             if type(cs_inv_poly) is Poly:
                 if type(result) is SampleView:
                     cs_inv_sol.append(self.decode_amplify_poly_with_bitstring(cs_inv_poly,result._data))
+                elif type(result) is SimpleNamespace:
+                    cs_inv_sol.append(self.decode_amplify_poly_with_bitstring(cs_inv_poly,result.values))
                 else:
                     cs_inv_sol.append(cs_inv_poly.decode(result.values))
             elif type(cs_inv_poly) in [float, np.float64]:
