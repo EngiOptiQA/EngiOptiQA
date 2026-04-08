@@ -1,4 +1,4 @@
-from amplify import solve, Solver, ToshibaSQBM2Client
+from amplify import solve, ToshibaSQBM2Client
 from amplify.client import FixstarsClient
 from amplify.client.ocean import DWaveSamplerClient, LeapHybridSamplerClient
 from datetime import timedelta
