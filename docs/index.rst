@@ -6,7 +6,7 @@
 Welcome to EngiOptiQA's documentation!
 ======================================
 
-*EngiOptiQA* is a software project that allows to perform **Engi**\neering **Opti**\mization with **Q**\uantum **A**\nnealing.
+*EngiOptiQA* is a software project that allows to perform **Engi**\neering **Opti**\mization with **Q**\uantum **A**\lgorithms.
 
 Overview
 ========
