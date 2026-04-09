@@ -17,13 +17,13 @@ class QAOASolverPennylane(QAOASolver):
     def __init__(self, token_file=None, proxy=None, *args, **kwargs):
         super().__init__(token_file=token_file, proxy=proxy, *args, **kwargs)
 
-    def setup_device(self, device='lightning.qubit'):
+    def setup_device(self, device='lightning.qubit', shots=None):
         wires = range(self.n_qubits)
 
         if device == 'MQSSPennylaneDevice':
             self.dev = MQSSPennylaneDevice(wires=wires, token=self.token, backends='EQE1')
         else:
-            self.dev =  qml.device(device, wires=wires)
+            self.dev =  qml.device(device, wires=wires, shots=shots)
 
 
     def convert_binary_to_ising(self, binary_poly_dict):
@@ -156,7 +156,7 @@ class QAOASolverPennylane(QAOASolver):
 
         return pairs
 
-    def solve_problem(self, problem, num_layers=1, mode='fixed'):
+    def solve_problem(self, problem, num_layers=1, mode='fixed', shots=None):
         print("Solving problem with Pennylane QAOA solver")
 
         # Convert the binary polynomial to an Ising polynomial
@@ -171,7 +171,7 @@ class QAOASolverPennylane(QAOASolver):
         self.construct_mixer_hamiltonian(scaling=True)
 
         # Set up the device
-        self.setup_device()
+        self.setup_device(shots=shots)
 
         # Prepare the QAOA ansatz
         self.num_layers = num_layers
