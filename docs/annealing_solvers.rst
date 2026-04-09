@@ -7,12 +7,12 @@ Annealing Solvers
 Annealing Solvers
 =================
 
-.. automodule::  engioptiqa.annealing_solvers
+.. automodule::  engioptiqa.solvers.annealing_solvers
 
 Annealing Solvers Base Class
 ----------------------------
 
-.. currentmodule:: engioptiqa.annealing_solvers.annealing_solver
+.. currentmodule:: engioptiqa.solvers.annealing_solvers.annealing_solver
 
 .. autoclass:: AnnealingSolver
 
@@ -26,12 +26,12 @@ Annealing Solvers Base Class
 Annealing Solvers Amplify
 =========================
 
-.. automodule::  engioptiqa.annealing_solvers.annealing_solver_amplify
+.. automodule::  engioptiqa.solvers.annealing_solvers.annealing_solver_amplify
 
 Annealing Solvers Amplify Class
 -------------------------------
 
-.. currentmodule:: engioptiqa.annealing_solvers.annealing_solver_amplify
+.. currentmodule:: engioptiqa.solvers.annealing_solvers.annealing_solver_amplify
 
 .. autoclass:: AnnealingSolverAmplify
 
@@ -44,12 +44,12 @@ Annealing Solvers Amplify Class
 Annealing Solvers DWave
 =======================
 
-.. automodule::  engioptiqa.annealing_solvers.annealing_solver_dwave
+.. automodule::  engioptiqa.solvers.annealing_solvers.annealing_solver_dwave
 
 Annealing Solvers DWave Class
 -----------------------------
 
-.. currentmodule:: engioptiqa.annealing_solvers.annealing_solver_dwave
+.. currentmodule:: engioptiqa.solvers.annealing_solvers.annealing_solver_dwave
 
 .. autoclass:: AnnealingSolverDWave
 
