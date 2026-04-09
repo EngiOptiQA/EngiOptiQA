@@ -1,5 +1,6 @@
 from collections import defaultdict
 import itertools
+from mqss.pennylane_adapter.device import MQSSPennylaneDevice
 import numpy
 import pennylane as qml
 from pennylane import numpy as np
@@ -7,60 +8,40 @@ from pennylane import qaoa
 from types import SimpleNamespace
 
 class QAOASolver:
-    def __init__(self, num_layers=1,*args, **kwargs):
-        self.num_layers = num_layers
+    def __init__(self, token_file=None, proxy=None, *args, **kwargs):
+        self.proxy = proxy
+        if token_file is not None:
+            self.token = open(token_file,"r").read().replace('\n', '')
 
 class QAOASolverPennylane(QAOASolver):
-    def __init__(self, num_layers=1, *args, **kwargs):
-        super().__init__(num_layers=num_layers, *args, **kwargs)
-        print("Initialized Pennylane QAOA solver with num_layers =", self.num_layers)
+    def __init__(self, token_file=None, proxy=None, *args, **kwargs):
+        super().__init__(token_file=token_file, proxy=proxy, *args, **kwargs)
 
-    def setup_device(self):
+    def setup_device(self, device='lightning.qubit'):
         wires = range(self.n_qubits)
-        self.dev =  qml.device("lightning.qubit", wires=wires)
-        # self.dev = MQSSPennylaneDevice(wires=wires, token=self.token, backends='EQE1')
+
+        if device == 'MQSSPennylaneDevice':
+            self.dev = MQSSPennylaneDevice(wires=wires, token=self.token, backends='EQE1')
+        else:
+            self.dev =  qml.device(device, wires=wires)
+
 
     def convert_binary_to_ising(self, binary_poly_dict):
-        # print(f"Original coefficients: {binary_poly_dict}")
         ising_poly_dict = defaultdict(float)
 
-
+        ising_poly_dict = defaultdict(float)
+        # Iterate over each term in the binary polynomial
         for term, binary_coeff in binary_poly_dict.items():
-            # print(f"Processing term: {term} with coeff {coeff}")
             degree = len(term)
-            # print(f"degree (number of binary variables involved): {degree}")
-            # Constant term
-            if degree == 0:
-                ising_poly_dict[()] += binary_coeff
-                continue
-
-            # qubits = tuple(term)
-            for r in range(0, degree+1):
-                for subset in itertools.combinations(term, r):
-                    # print(f"  Subset: {subset}, r: {r}")
-                    ising_coeff = binary_coeff * ((-1)**r) / (2**degree)
-                    subset = tuple(sorted(subset))
-                    # print(f"    Adding coeff {coeff} to subset {subset}")
-                    ising_poly_dict[subset] += ising_coeff
-
-        # print(f"Ising coefficients: {ising_poly_dict}")
-
-        ising_poly_dict_new = defaultdict(float)
-        for term, binary_coeff in binary_poly_dict.items():
-            # print(f"Processing term: {term} with coeff {c}")
-            degree = len(term)
-
-            # Handle all degrees uniformly (including constants)
+            # For each term, we need to consider all subsets of the variables
+            # in the term to convert to Ising form
             for r in range(0, degree + 1):
-                # Subsets of size r (r = 0 gives the empty subset)
+                # The factor accounts for the transformation from binary to Ising variables
                 factor = ((-1)**r) / (2**degree) if degree > 0 else 1.0
                 for subset in itertools.combinations(term, r):
-                    subset = tuple(sorted(subset))  # empty subset becomes ()
-                    # print(f"  Subset: {subset}, r: {r}, factor: {factor}, c * factor: {c * factor}")
-                    ising_poly_dict_new[subset] += binary_coeff * factor
+                    subset = tuple(sorted(subset))
+                    ising_poly_dict[subset] += binary_coeff * factor
 
-        # print(f"Ising coefficients (new): {ising_poly_dict_new}")
-        ising_poly_dict = ising_poly_dict_new
         return ising_poly_dict
 
     def construct_cost_hamiltonian(self, ising_poly_dict, normalize=True):
@@ -86,10 +67,8 @@ class QAOASolverPennylane(QAOASolver):
             coeff_abs_max = np.max(np.abs(coeffs))
             coeffs_norm = (coeffs / coeff_abs_max).tolist()
             self.H_cost = qml.Hamiltonian(coeffs_norm, self.H_cost.ops)
-        # print(f"Maximum coefficient: {self.H_cost.coeffs[np.argmax(np.abs(coeffs_norm))]:.4f},")
-        # print(f"Minimum coefficient: {self.H_cost.coeffs[np.argmin(np.abs(coeffs_norm))]:.4f},")
+
         # print("Cost Hamiltonian:", self.H_cost)
-        # return H_cost
 
     def construct_mixer_hamiltonian(self, scaling=True):
 
@@ -98,9 +77,8 @@ class QAOASolverPennylane(QAOASolver):
             mean_coeff_abs = np.mean(np.abs(self.H_cost.coeffs))
             scale_factor = mean_coeff_abs if mean_coeff_abs != 0 else 1.0
         self.H_mixer = qml.Hamiltonian([scale_factor]*self.n_qubits, [qml.PauliX(i) for i in range(self.n_qubits)])
-        # print("Mixer Hamiltonian:", self.H_mixer)
 
-        # return H_mixer
+        # print("Mixer Hamiltonian:", self.H_mixer)
 
     def qaoa_layer(self, beta, gamma):
         qaoa.cost_layer(gamma, self.H_cost)
@@ -150,7 +128,6 @@ class QAOASolverPennylane(QAOASolver):
 
     def optimize_linear_ramp_parameters(self, dbeta_initial, dgamma_initial):
 
-
         def objective(params):
             dbeta, dgamma = params
             betas = np.linspace(1, 0, self.num_layers)  * dbeta
@@ -179,7 +156,7 @@ class QAOASolverPennylane(QAOASolver):
 
         return pairs
 
-    def solve_problem(self, problem, mode='fixed'):
+    def solve_problem(self, problem, num_layers=1, mode='fixed'):
         print("Solving problem with Pennylane QAOA solver")
 
         # Convert the binary polynomial to an Ising polynomial
@@ -193,9 +170,14 @@ class QAOASolverPennylane(QAOASolver):
         self.construct_cost_hamiltonian(ising_poly_dict, normalize=True)
         self.construct_mixer_hamiltonian(scaling=True)
 
+        # Set up the device
         self.setup_device()
+
+        # Prepare the QAOA ansatz
+        self.num_layers = num_layers
         self.ansatz = self.qaoa_ansatz
 
+        # Determine the parameters for the QAOA circuit
         if mode == 'fixed':
             betas = np.linspace(1, 0, self.num_layers)
             gammas = np.linspace(0, 1, self.num_layers)
