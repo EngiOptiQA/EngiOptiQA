@@ -1,6 +1,5 @@
-from .annealing_solvers import *
 from .problems import *
-from .vqa_solvers import *
+from .solvers import *
 __all__ = [
     "AnnealingSolverAmplify",
     "AnnealingSolverDWave",

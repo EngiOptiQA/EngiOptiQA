@@ -13,18 +13,22 @@ Overview
 
 *EngiOptiQA* consists of three main modules:
 
-1. :ref:`Annealing Solvers Module<solvers-module>`
+1. :ref:`Solvers Module<solvers-module>`
 2. :ref:`Problems Module<problems-module>`
 3. :ref:`Variables Module<variables-module>`
 
 .. _solvers-module:
 
-Annealing Solvers Module
-========================
+Solvers Module
+================
 
 This module contains solvers for *Polynomial Unconstrained Binary Optimization (PUBO)* problems.
-There are two alternative implementations based on the `Fixstars Amplify SDK <https://amplify.fixstars.com/en/sdk>`_ or the `D-Wave Ocean SDK <https://www.dwavesys.com/solutions-and-products/ocean/>`_, respectively.
+There are currently two types of solvers available: *annealing solvers* and *variational quantum algorithms (VQAs)*.
+Furthermore, the module includes a *brute-force solver* for testing purposes.
+For the annealing solvers, there are two alternative implementations based on the `Fixstars Amplify SDK <https://amplify.fixstars.com/en/sdk>`_ or the `D-Wave Ocean SDK <https://www.dwavesys.com/solutions-and-products/ocean/>`_, respectively.
 Please note that the D‑Wave implementation requires transforming the problem into a *Quadratic Unconstrained Binary Optimization (QUBO)* formulation before solving.
+For the VQAs, there is an implementation of the *Quantum Approximate Optimization Algorithm (QAOA)* based on `PennyLane <https://pennylane.ai/>`_.
+
 
 .. toctree::
    :maxdepth: 2

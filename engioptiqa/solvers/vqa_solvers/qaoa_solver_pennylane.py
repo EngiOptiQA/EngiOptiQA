@@ -203,6 +203,13 @@ class QAOASolverPennylane(QAOASolver):
 
         # Sort bitstrings by probability and store results in the problem
         bitdict_prob_pairs = self.sort_bitstrings_by_probs(probs)
+
+        # top_pairs = bitdict_prob_pairs[:50]  # Store top 50 solutions
+        # problem.results = [
+        #     SimpleNamespace(values=bit_dict, energy=0, frequency=1)
+        #     for bit_dict, _ in top_pairs
+        # ]
+
         problem.results = [SimpleNamespace(values=bit_dict, energy=0, frequency=1) for bit_dict, _ in bitdict_prob_pairs]
         sorted_probabilities = [p for _, p in bitdict_prob_pairs]
 
