@@ -1,0 +1,228 @@
+from collections import defaultdict
+import itertools
+import numpy
+import pennylane as qml
+from pennylane import numpy as np
+from pennylane import qaoa
+from types import SimpleNamespace
+
+class QAOASolver:
+    def __init__(self, num_layers=1,*args, **kwargs):
+        self.num_layers = num_layers
+
+class QAOASolverPennylane(QAOASolver):
+    def __init__(self, num_layers=1, *args, **kwargs):
+        super().__init__(num_layers=num_layers, *args, **kwargs)
+        print("Initialized Pennylane QAOA solver with num_layers =", self.num_layers)
+
+    def setup_device(self):
+        wires = range(self.n_qubits)
+        self.dev =  qml.device("lightning.qubit", wires=wires)
+        # self.dev = MQSSPennylaneDevice(wires=wires, token=self.token, backends='EQE1')
+
+    def convert_binary_to_ising(self, binary_poly_dict):
+        # print(f"Original coefficients: {binary_poly_dict}")
+        ising_poly_dict = defaultdict(float)
+
+
+        for term, binary_coeff in binary_poly_dict.items():
+            # print(f"Processing term: {term} with coeff {coeff}")
+            degree = len(term)
+            # print(f"degree (number of binary variables involved): {degree}")
+            # Constant term
+            if degree == 0:
+                ising_poly_dict[()] += binary_coeff
+                continue
+
+            # qubits = tuple(term)
+            for r in range(0, degree+1):
+                for subset in itertools.combinations(term, r):
+                    # print(f"  Subset: {subset}, r: {r}")
+                    ising_coeff = binary_coeff * ((-1)**r) / (2**degree)
+                    subset = tuple(sorted(subset))
+                    # print(f"    Adding coeff {coeff} to subset {subset}")
+                    ising_poly_dict[subset] += ising_coeff
+
+        # print(f"Ising coefficients: {ising_poly_dict}")
+
+        ising_poly_dict_new = defaultdict(float)
+        for term, binary_coeff in binary_poly_dict.items():
+            # print(f"Processing term: {term} with coeff {c}")
+            degree = len(term)
+
+            # Handle all degrees uniformly (including constants)
+            for r in range(0, degree + 1):
+                # Subsets of size r (r = 0 gives the empty subset)
+                factor = ((-1)**r) / (2**degree) if degree > 0 else 1.0
+                for subset in itertools.combinations(term, r):
+                    subset = tuple(sorted(subset))  # empty subset becomes ()
+                    # print(f"  Subset: {subset}, r: {r}, factor: {factor}, c * factor: {c * factor}")
+                    ising_poly_dict_new[subset] += binary_coeff * factor
+
+        # print(f"Ising coefficients (new): {ising_poly_dict_new}")
+        ising_poly_dict = ising_poly_dict_new
+        return ising_poly_dict
+
+    def construct_cost_hamiltonian(self, ising_poly_dict, normalize=True):
+
+        coeffs = [] # List of coefficients for the Hamiltonian terms
+        ops = [] # List of corresponding operators
+
+        # Remove constant term
+        ising_poly_dict.pop((), 0.0)
+
+        for qubits, c in ising_poly_dict.items():
+            op = qml.PauliZ(qubits[0])
+            for q in qubits[1:]:
+                op = op @ qml.PauliZ(q)
+            coeffs.append(c)
+            ops.append(op)
+
+        self.H_cost = qml.Hamiltonian(coeffs, ops)
+
+        if normalize:
+            coeffs = np.array(self.H_cost.coeffs, dtype=float)
+
+            coeff_abs_max = np.max(np.abs(coeffs))
+            coeffs_norm = (coeffs / coeff_abs_max).tolist()
+            self.H_cost = qml.Hamiltonian(coeffs_norm, self.H_cost.ops)
+        # print(f"Maximum coefficient: {self.H_cost.coeffs[np.argmax(np.abs(coeffs_norm))]:.4f},")
+        # print(f"Minimum coefficient: {self.H_cost.coeffs[np.argmin(np.abs(coeffs_norm))]:.4f},")
+        # print("Cost Hamiltonian:", self.H_cost)
+        # return H_cost
+
+    def construct_mixer_hamiltonian(self, scaling=True):
+
+        scale_factor = 1.0
+        if scaling:
+            mean_coeff_abs = np.mean(np.abs(self.H_cost.coeffs))
+            scale_factor = mean_coeff_abs if mean_coeff_abs != 0 else 1.0
+        self.H_mixer = qml.Hamiltonian([scale_factor]*self.n_qubits, [qml.PauliX(i) for i in range(self.n_qubits)])
+        # print("Mixer Hamiltonian:", self.H_mixer)
+
+        # return H_mixer
+
+    def qaoa_layer(self, beta, gamma):
+        qaoa.cost_layer(gamma, self.H_cost)
+        qaoa.mixer_layer(-beta, self.H_mixer)  # Watch out for the minus sign!
+
+    def qaoa_ansatz(self, betas, gammas):
+        for w in range(self.n_qubits):
+            qml.Hadamard(wires=w)
+        qml.layer(self.qaoa_layer, self.num_layers, betas, gammas)
+
+    def qaoa_probability_circuit(self):
+
+        @qml.qnode(self.dev)
+        def probability_circuit(betas, gammas):
+            self.ansatz(betas, gammas)
+            return qml.probs(wires=range(self.n_qubits))
+
+        return probability_circuit
+
+    def qaoa_expectation_circuit(self):
+
+        @qml.qnode(self.dev, interface="auto", diff_method="best")
+        def expectation_circuit(betas, gammas):
+            self.ansatz(betas, gammas)
+            return qml.expval(self.H_cost)
+
+        return expectation_circuit
+
+    def objective_function(self, betas, gammas):
+        expectation_circuit = self.qaoa_expectation_circuit()
+        return expectation_circuit(betas, gammas)
+
+    def optimize_parameters(self, initial_betas, initial_gammas):
+
+        def objective(params):
+            betas = params[:self.num_layers]
+            gammas = params[self.num_layers:]
+            return self.objective_function(betas, gammas)
+
+        params = np.concatenate([initial_betas, initial_gammas], requires_grad=True)
+
+        for i in range(10):
+            params = self.optimizer.step(objective, params)
+            print(f"Optimization iteration {i+1}/10: {objective(params):.4f}")
+
+        return params[:self.num_layers], params[self.num_layers:]
+
+    def optimize_linear_ramp_parameters(self, dbeta_initial, dgamma_initial):
+
+
+        def objective(params):
+            dbeta, dgamma = params
+            betas = np.linspace(1, 0, self.num_layers)  * dbeta
+            gammas = np.linspace(0, 1, self.num_layers) * dgamma
+            return self.objective_function(betas, gammas)
+
+        params = np.array([dbeta_initial, dgamma_initial], requires_grad=True)
+        for i in range(3):
+            params = self.optimizer.step(objective, params)
+            print(f"Optimization iteration {i+1}/3: {objective(params):.4f}")
+
+        return params[0], params[1]
+
+    def sort_bitstrings_by_probs(self, probs):
+        print(f'sum(probs): {sum(probs)}')
+        bitdicts = [
+            {i: int(b) for i, b in enumerate(format(x, f"0{self.n_qubits}b"))}
+            for x in range(2**self.n_qubits)
+        ]
+        print("Number of solutions:", len(bitdicts))
+        pairs = list(zip(bitdicts, probs))
+        pairs.sort(key=lambda x: x[1], reverse=True)
+
+        best_bitstring, best_prob = pairs[0]
+        print("Most likely:", best_bitstring, best_prob)
+
+        return pairs
+
+    def solve_problem(self, problem, mode='fixed'):
+        print("Solving problem with Pennylane QAOA solver")
+
+        # Convert the binary polynomial to an Ising polynomial
+        binary_poly_dict = problem.binary_quadratic_model.objective.asdict()
+        ising_poly_dict = self.convert_binary_to_ising(binary_poly_dict)
+
+        # Determine the number of qubits
+        self.n_qubits = max([max(k) for k in ising_poly_dict.keys() if len(k) > 0], default=-1) + 1
+
+        # Build PennyLane Hamiltonians
+        self.construct_cost_hamiltonian(ising_poly_dict, normalize=True)
+        self.construct_mixer_hamiltonian(scaling=True)
+
+        self.setup_device()
+        self.ansatz = self.qaoa_ansatz
+
+        if mode == 'fixed':
+            betas = np.linspace(1, 0, self.num_layers)
+            gammas = np.linspace(0, 1, self.num_layers)
+        else:
+            self.optimizer = qml.AdamOptimizer()
+            if mode == 'linear_ramp':
+                dbeta_initial = 1.
+                dgamma_initial = 1.
+                dbeta, dgamma = self.optimize_linear_ramp_parameters(dbeta_initial, dgamma_initial)
+                betas = np.linspace(1, 0, self.num_layers) * dbeta
+                gammas = np.linspace(0, 1, self.num_layers) * dgamma
+            else:
+                betas_initial = np.random.uniform(0, 1, self.num_layers)
+                gammas_initial = np.random.uniform(0, 1, self.num_layers)
+                betas, gammas = self.optimize_parameters(betas_initial, gammas_initial)
+
+        # For the final circuit, compute probabilities of all bitstrings
+        probability_circuit = self.qaoa_probability_circuit()
+        probs = probability_circuit(betas, gammas)
+        if probs.ndim == 2 and probs.shape[0] == 1:
+            probs = probs[0]
+        probs = probs.reshape(-1)
+
+        # Sort bitstrings by probability and store results in the problem
+        bitdict_prob_pairs = self.sort_bitstrings_by_probs(probs)
+        problem.results = [SimpleNamespace(values=bit_dict, energy=0, frequency=1) for bit_dict, _ in bitdict_prob_pairs]
+        sorted_probabilities = [p for _, p in bitdict_prob_pairs]
+
+        return sorted_probabilities
+
