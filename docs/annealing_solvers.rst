@@ -62,12 +62,12 @@ Annealing Solvers DWave Class
 Annealing Solvers OpenJij
 =========================
 
-.. automodule::  engioptiqa.annealing_solvers.annealing_solver_openjij
+.. automodule::  engioptiqa.solvers.annealing_solvers.annealing_solver_openjij
 
 Annealing Solvers OpenJij Class
 -------------------------------
 
-.. currentmodule:: engioptiqa.annealing_solvers.annealing_solver_openjij
+.. currentmodule:: engioptiqa.solvers.annealing_solvers.annealing_solver_openjij
 
 .. autoclass:: AnnealingSolverOpenJij
 

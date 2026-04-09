@@ -7,7 +7,7 @@
 **Please note:** _EngiOptiQA_ is currently in a very early stage of development. As the project progresses, documentation, additional features, and enhancements will be added.
 
 ## Overview
-_EngiOptiQA_ is a Python software library dedicated to **Engi**neering **Opti**mization with **Q**uantum **A**nnealing (QA).
+_EngiOptiQA_ is a Python software library dedicated to **Engi**neering **Opti**mization with **Q**uantum **A**lgorithms.
 This project provides a set of tools to formulate engineering optimization problems suitable for QA.
 
 A minimal documentation can be found under [https://engioptiqa.github.io/EngiOptiQA/](https://engioptiqa.github.io/EngiOptiQA/). To learn more about the background of _EngiOptiQA_ and the implemented problem formulations, please refer to the corresponding publication [[1]](#pub1).
