@@ -45,10 +45,10 @@ n_qubits_per_node = 10
 
 analysis_problem.generate_discretization(n_qubits_per_node, binary_representation)
 
-# QUBO Formulation Using the Amplify SDK
+# Problem Formulation Using the Amplify SDK
 # --------------------------------------
 penalty_weight = 62.5e3
-analysis_problem.generate_qubo_formulation(penalty_weight=penalty_weight)
+analysis_problem.generate_problem_formulation(penalty_weight=penalty_weight)
 
 # Transform Amplify Problem for D-Wave Solver
 # -------------------------------------------
