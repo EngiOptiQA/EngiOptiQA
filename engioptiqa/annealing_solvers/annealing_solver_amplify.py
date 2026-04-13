@@ -57,5 +57,5 @@ class AnnealingSolverAmplify(AnnealingSolver):
         print("Created solver")
 
     def solve_problem(self, problem):
-        problem.results = solve(problem.binary_quadratic_model, self.client)
+        problem.results = solve(problem.binary_model, self.client)
         print('Number of solutions:', len(problem.results))
