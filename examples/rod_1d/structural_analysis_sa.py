@@ -56,7 +56,7 @@ analysis_problem.transform_to_dwave()
 
 # Solve QUBO Problem by Simulated Annealing
 # -----------------------------------------
-annealing_solver_sa.solve_qubo_problem(
+annealing_solver_sa.solve_problem(
     analysis_problem,
     num_reads=200,
     )
