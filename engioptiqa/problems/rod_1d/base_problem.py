@@ -304,7 +304,7 @@ class BaseProblem(ABC):
 
     def get_qubo_matrix(self):
         bq = AcceptableDegrees(objective={"Binary": "Quadratic"})
-        im, mapping =  self.binary_model.to_intermediate_model(bq)
+        im, mapping =  self.binary_model.to_intermediate_model(bq, quadratization_method="IshikawaKZFD")
         coeff_dict = im.objective.asdict()
 
         # 1. Determine the number of variables
@@ -412,7 +412,7 @@ class BaseProblem(ABC):
     def transform_to_dwave(self):
 
         bq = AcceptableDegrees(objective={"Binary": "Quadratic"})
-        im, mapping =  self.binary_model.to_intermediate_model(bq)
+        im, mapping =  self.binary_model.to_intermediate_model(bq, quadratization_method="IshikawaKZFD")
 
         output = f'Number of input qubits: {len(self.binary_model.get_variables())}\n'
         output+= f'Number of logical qubits: {len(im.get_variables())}\n'
