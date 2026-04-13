@@ -21,7 +21,7 @@ class BruteForceSolver:
         return objective
 
     def solve_problem(self, problem):
-        model = problem.binary_quadratic_model
+        model = problem.binary_model
         num_vars = len(model.variables)
         if num_vars > self.max_vars:
             msg = f"Brute-force infeasible: num_vars={num_vars} leads to 2^{num_vars} evaluations."
