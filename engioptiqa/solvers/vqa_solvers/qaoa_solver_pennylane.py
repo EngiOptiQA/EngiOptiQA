@@ -160,7 +160,7 @@ class QAOASolverPennylane(QAOASolver):
         print("Solving problem with Pennylane QAOA solver")
 
         # Convert the binary polynomial to an Ising polynomial
-        binary_poly_dict = problem.binary_quadratic_model.objective.asdict()
+        binary_poly_dict = problem.binary_model.objective.asdict()
         ising_poly_dict = self.convert_binary_to_ising(binary_poly_dict)
 
         # Determine the number of qubits
