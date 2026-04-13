@@ -280,29 +280,10 @@ class BaseProblem(ABC):
         # Only consider equilibrium constraint, since traction BC is built into ansatz.
         self.equilibrium_constraint_poly =  con_eq
 
-    def generate_qubo_formulation(self, penalty_weight = 1.0):
+    def generate_problem_formulation(self, penalty_weight = 1.0):
         self.generate_complementary_energy_poly()
         self.generate_constraint_polys()
 
-        PI_quadratic_model = Model(self.complementary_energy_poly)
-        constraints_quadratic_model = Model(self.equilibrium_constraint_poly)
-
-        # self.PI_qubo_matrix, self.PI_QUBO_const = PI_quadratic_model.logical_matrix
-        # self.constraints_qubo_matrix, self.constraints_QUBO_const = constraints_quadratic_model.logical_matrix
-
-        # TODO Scaling
-        # PI_abs = np.abs(self.PI_qubo_matrix.to_numpy())
-        # PI_max = np.max(PI_abs)
-        # print("Magnitude Complementary Energy", PI_max)
-
-        # con_eq_abs = np.abs(self.constraints_qubo_matrix.to_numpy())
-        # con_eq_max = np.max(con_eq_abs)
-        # print("Magnitude Constraint EQ", con_eq_max)
-
-        # Options for penalty weight:
-        # 1. Scale
-        # self.penalty_weight_equilibrium = PI_max/con_eq_max * penalty_weight
-        # 2. Do not scale
         self.penalty_weight_equilibrium = penalty_weight
         print(f"Effective penalty weight: {self.penalty_weight_equilibrium}\n")
         self.poly = self.complementary_energy_poly + \
@@ -310,13 +291,10 @@ class BaseProblem(ABC):
 
         self.binary_quadratic_model = Model(self.poly)
 
-        # self.qubo_matrix, self.PI_QUBO_const = self.binary_quadratic_model.logical_matrix
-
-
         output = f'Number of input qubits: {len(self.binary_quadratic_model.get_variables())}\n'
         self.print_and_log(output)
 
-    def update_penalty_weight_in_qubo_formulation(self, penalty_weight = 1.0):
+    def update_penalty_weight_in_problem_formulation(self, penalty_weight = 1.0):
         self.penalty_weight_equilibrium = penalty_weight
         print(f"Effective penalty weight: {self.penalty_weight_equilibrium}\n")
         self.poly = self.complementary_energy_poly + \
@@ -365,7 +343,6 @@ class BaseProblem(ABC):
         # Visualize the QUBO Matrix.
         plt.figure()
         plt.suptitle(title)
-        # plt.imshow(self.qubo_matrix.to_numpy(),interpolation='none')
         plt.imshow(Q,interpolation='none')
         plt.colorbar()
         if show_fig:
