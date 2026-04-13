@@ -23,7 +23,7 @@ class QAOASolverPennylane(QAOASolver):
         if device == 'MQSSPennylaneDevice':
             self.dev = MQSSPennylaneDevice(wires=wires, token=self.token, backends='EQE1')
         else:
-            self.dev =  qml.device(device, wires=wires, shots=shots)
+            self.dev = qml.device(device, wires=wires, shots=shots)
 
 
     def convert_binary_to_ising(self, binary_poly_dict):
