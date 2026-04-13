@@ -22,8 +22,9 @@ Overview
 Annealing Solvers Module
 ========================
 
-This module contains solvers for *Quadratic Unconstrained Binary Optimization (QUBO)* problems.
-There are two alternative implementations based on the `Fixstars Amplify SDK <https://amplify.fixstars.com/en/sdk>`_ or the `DWave Ocean SDK <https://www.dwavesys.com/solutions-and-products/ocean/>`_, respectively.
+This module contains solvers for *Polynomial Unconstrained Binary Optimization (PUBO)* problems.
+There are two alternative implementations based on the `Fixstars Amplify SDK <https://amplify.fixstars.com/en/sdk>`_ or the `D-Wave Ocean SDK <https://www.dwavesys.com/solutions-and-products/ocean/>`_, respectively.
+Please note that the D‑Wave implementation requires transforming the problem into a *Quadratic Unconstrained Binary Optimization (QUBO)* formulation before solving.
 
 .. toctree::
    :maxdepth: 2
@@ -35,7 +36,7 @@ There are two alternative implementations based on the `Fixstars Amplify SDK <ht
 Problems Module
 ===============
 
-This modules provides classes for setting up *QUBO* problems. 
+This modules provides classes for setting up *PUBO* problems.
 So far, this includes the one-dimensional problem of a rod.
 
 .. toctree::
