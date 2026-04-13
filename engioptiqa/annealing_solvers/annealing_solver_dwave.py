@@ -62,7 +62,7 @@ class AnnealingSolverDWave(AnnealingSolver):
 
         print("Use", self.solver_type, "solver:", self.solver_name)
 
-    def solve_qubo_problem(self, problem, **kwargs):
+    def solve_problem(self, problem, **kwargs):
 
         problem.results_indices = self.solver.sample(
             problem.binary_quadratic_model_indices,

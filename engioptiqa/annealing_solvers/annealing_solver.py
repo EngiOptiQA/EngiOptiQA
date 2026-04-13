@@ -17,5 +17,5 @@ class AnnealingSolver(ABC):
         pass
 
     @abstractmethod
-    def solve_qubo_problem(self, problem):
+    def solve_problem(self, problem):
         pass
