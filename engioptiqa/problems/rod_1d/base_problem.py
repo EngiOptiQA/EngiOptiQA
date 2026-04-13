@@ -289,9 +289,9 @@ class BaseProblem(ABC):
         self.poly = self.complementary_energy_poly + \
             self.penalty_weight_equilibrium * self.equilibrium_constraint_poly
 
-        self.binary_quadratic_model = Model(self.poly)
+        self.binary_model = Model(self.poly)
 
-        output = f'Number of input qubits: {len(self.binary_quadratic_model.get_variables())}\n'
+        output = f'Number of input qubits: {len(self.binary_model.get_variables())}\n'
         self.print_and_log(output)
 
     def update_penalty_weight_in_problem_formulation(self, penalty_weight = 1.0):
@@ -300,11 +300,11 @@ class BaseProblem(ABC):
         self.poly = self.complementary_energy_poly + \
             self.penalty_weight_equilibrium * self.equilibrium_constraint_poly
 
-        self.binary_quadratic_model = Model(self.poly)
+        self.binary_model = Model(self.poly)
 
     def get_qubo_matrix(self):
         bq = AcceptableDegrees(objective={"Binary": "Quadratic"})
-        im, mapping =  self.binary_quadratic_model.to_intermediate_model(bq)
+        im, mapping =  self.binary_model.to_intermediate_model(bq)
         coeff_dict = im.objective.asdict()
 
         # 1. Determine the number of variables
@@ -412,9 +412,9 @@ class BaseProblem(ABC):
     def transform_to_dwave(self):
 
         bq = AcceptableDegrees(objective={"Binary": "Quadratic"})
-        im, mapping =  self.binary_quadratic_model.to_intermediate_model(bq)
+        im, mapping =  self.binary_model.to_intermediate_model(bq)
 
-        output = f'Number of input qubits: {len(self.binary_quadratic_model.get_variables())}\n'
+        output = f'Number of input qubits: {len(self.binary_model.get_variables())}\n'
         output+= f'Number of logical qubits: {len(im.get_variables())}\n'
         self.print_and_log(output)
         coeff_dict = im.objective.asdict()
@@ -422,7 +422,7 @@ class BaseProblem(ABC):
         linear = {k[0]: v for k, v in coeff_dict.items() if len(k) == 1}
         quadratic = {tuple(k): v for k, v in coeff_dict.items() if len(k) == 2}
 
-        self.binary_quadratic_model_indices = BinaryQuadraticModelDWave(linear, quadratic, constant, vartype='BINARY')
+        self.binary_quadratic_model_dwave = BinaryQuadraticModelDWave(linear, quadratic, constant, vartype='BINARY')
 
     def get_bit_array(self, result):
         if type(result) is SampleView:

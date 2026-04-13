@@ -64,32 +64,19 @@ class AnnealingSolverDWave(AnnealingSolver):
 
     def solve_problem(self, problem, **kwargs):
 
-        problem.results_indices = self.solver.sample(
-            problem.binary_quadratic_model_indices,
+        problem.results = self.solver.sample(
+            problem.binary_quadratic_model_dwave,
             **kwargs
         )
-        print('Number of solutions:', len(problem.results_indices))
-        if hasattr(problem, 'mapping_i_to_q'):
-            problem.results =  problem.results_indices.relabel_variables(
-                problem.mapping_i_to_q,
-                inplace=False)
-        else:
-            problem.results = problem.results_indices
+        print('Number of solutions:', len(problem.results))
 
     def perform_local_search(self, problem):
 
-        if hasattr(problem, 'results_indices'):
+        if hasattr(problem, 'results'):
             solver_greedy = SteepestDescentSolver()
-            sampleset_pp = solver_greedy.sample(
-                problem.binary_quadratic_model_indices,
-                initial_states=problem.results_indices
+            problem.results_pp = solver_greedy.sample(
+                problem.binary_quadratic_model_dwave,
+                initial_states=problem.results
                 )
-            if hasattr(problem, 'mapping_i_to_q'):
-                problem.results_pp = sampleset_pp.relabel_variables(
-                    problem.mapping_i_to_q,
-                    inplace=False)
-            else:
-                problem.results_pp = sampleset_pp
-
         else:
             raise Exception('Trying to perform local search altough no results exist yet.')
