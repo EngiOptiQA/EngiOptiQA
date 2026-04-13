@@ -12,15 +12,15 @@ authors = [
 license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
-    "amplify[extra]==1.4.0",
-    "dwave-cloud-client==0.14.0",
-    "dwave-samplers==1.6.0",
-    "dwave-system==1.33.0",
-    "matplot2tikz==0.4.2",
-    "matplotlib==3.10.7",
-    "numpy==2.2.6",
-    "prettytable==3.16.0",
-    "sympy==1.14.0"
+    "amplify[extra]~=1.5",
+    "dwave-cloud-client~=0.14",
+    "dwave-samplers~=1.7",
+    "dwave-system~=1.34",
+    "matplot2tikz~=0.5",
+    "matplotlib~=3.10",
+    "numpy~=2.0",
+    "prettytable~=3.17",
+    "sympy~=1.14"
 ]
 dynamic = ["version"]
 
