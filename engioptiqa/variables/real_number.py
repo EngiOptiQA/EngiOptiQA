@@ -76,10 +76,11 @@ class RealNumber:
 
         print('Value:', value_to_approximate,\
              'Approximation:', self.evaluate(q_opt),\
+             'Binary:', q_opt,\
              'Difference:', diff_opt, \
              'Relative Difference', diff_opt_rel)
 
-        return diff_opt, diff_opt_rel
+        return q_opt, diff_opt, diff_opt_rel
 
 class Real(RealNumber):
     def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None):
@@ -143,4 +144,81 @@ class Range(RealNumber):
         F = 2 ** np.arange(self.n_qubits, dtype=float)
         scale = (self.a_max - self.a_min) / (2**self.n_qubits - 1)
         return self.a_min + scale * sum(F[l] * q[l] for l in range(self.n_qubits))
+
+    def set_range(self, a_min, a_max):
+        if a_max <= a_min:
+            raise Exception('a_max must be greater than a_min.')
+        self.a_min = a_min
+        self.a_max = a_max
+
+    def update_range(self, a, a_bit_array, a_prev, a_min, a_max, relaxation_factor):
+
+        actions = []
+        c = relaxation_factor
+
+        old_min = a_min
+        old_max = a_max
+
+        delta = a_max - a_min
+        delta_min = a_prev - a_min
+        delta_max = a_max - a_prev
+
+        if a < a_prev:
+            a_max = a_max - c*delta_max
+            print("\tLowering upper bound.")
+            actions.append("max ▼")
+        elif a > a_prev:
+            a_min = a_min + c*delta_min
+            print("\tRaising lower bound.")
+            actions.append("min ▲")
+        elif a == a_prev:
+            a_min = a - delta * c/4
+            a_max = a + delta * c/4
+            print("\tShrinking range.")
+            actions.append("shrink ▶◀")
+
+        # Expand range if all qubits at a node are 1 or 0
+        if all(b == 1 for b in a_bit_array):
+            print(f"\tAll qubits are 1, expanding range in positive direction.")
+            a_max += 0.25 * delta
+            actions.append("max ▲")
+        elif all(b == 0 for b in a_bit_array):
+            print(f"\tAll qubits are 0, expanding range in negative direction.")
+            a_min -= 0.25 * delta
+            actions.append("min ▼")
+
+        if old_min != a_min or old_max != a_max:
+            print(f"\tUpdated range: [{a_min}, {a_max}], ({(a_max - a_min):.6e})")
+        else:
+            actions.append("none")
+
+        return a_min, a_max, actions
+
+    def re_encode_number(self, a, a_min_new, a_max_new):
+
+        a_bits = self.encode_real_to_bits(a, a_min_new, a_max_new)
+        a_new = self.decode_bits_to_real(a_bits, a_min_new, a_max_new)
+        rel_err_a_encoded = np.abs(a_new - a) / np.abs(a) if a != 0 else np.nan
+
+        return a_bits, a_new, rel_err_a_encoded
+
+    def encode_real_to_bits(self,value, a_min, a_max):
+        if a_max == a_min:
+            norm = 0.0
+        else:
+            norm = (value - a_min) / (a_max - a_min)
+        norm = min(max(norm, 0.0), 1.0)
+        int_val = int(round(norm * (2**self.n_qubits - 1)))
+        bits = [int(c) for c in format(int_val, f'0{self.n_qubits}b')[::-1]]
+        return bits
+
+    def decode_bits_to_real(self, bits, a_min, a_max):
+        int_val = sum((b & 1) << i for i, b in enumerate(bits))
+        denom = (2**self.n_qubits - 1)
+        norm = int_val / denom if denom > 0 else 0.0
+        value = a_min + norm * (a_max - a_min)
+        return value
+
+
+
 

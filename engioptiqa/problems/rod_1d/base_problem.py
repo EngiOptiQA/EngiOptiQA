@@ -174,6 +174,19 @@ class BaseProblem(ABC):
     def generate_discretization():
         pass
 
+    def update_nodal_force_ranges(self, nf, nf_bit_array, nf_prev):
+
+        for i_node in range(self.rod.n_comp):
+
+            # Extract bit array for current node
+            start = i_node * self.n_qubits_per_node
+            end = (i_node + 1) * self.n_qubits_per_node
+            nf_bit_array_node = nf_bit_array[start:end]
+
+            self.a_min[i_node], self.a_max[i_node], actions = self.real_number.update_range(
+                nf[i_node], nf_bit_array_node, nf_prev[i_node], self.a_min[i_node], self.a_max[i_node], 0.25
+            )
+
     def generate_nodal_force_polys(self, n_qubits_per_node, binary_representation, lower_lim=None, upper_lim=None):
         assert(self.variable_generator is not None)
         if binary_representation == 'range':
@@ -183,15 +196,12 @@ class BaseProblem(ABC):
             self.a_max = np.ones(self.rod.n_comp)*upper_lim
         self.n_qubits_per_node = n_qubits_per_node
         self.binary_representation = binary_representation
-        self.real_number = RealNumber(self.n_qubits_per_node, self.binary_representation)
+        self.real_number = RealNumber(self.n_qubits_per_node, self.binary_representation, lower_lim, upper_lim)
 
         nf_polys = []
         for i_comp in range(self.rod.n_comp):
             q = self.variable_generator.array("Binary", self.n_qubits_per_node)
-            if binary_representation == 'range':
-                nf_polys.append(self.real_number.evaluate(q, self.a_min[i_comp], self.a_max[i_comp]))
-            else:
-                nf_polys.append(self.real_number.evaluate(q))
+            nf_polys.append(self.real_number.evaluate(q))
             if i_comp == self.rod.n_comp-1:
                 nf_polys.append(0.0)
         self.nf_polys = nf_polys
@@ -202,9 +212,8 @@ class BaseProblem(ABC):
         for i_comp in range(self.rod.n_comp):
             q = self.variable_generator.array("Binary", self.n_qubits_per_node)
             if self.binary_representation == 'range':
-                nf_polys.append(self.real_number.evaluate(q, self.a_min[i_comp], self.a_max[i_comp]))
-            else:
-                nf_polys.append(self.real_number.evaluate(q))
+                self.real_number.set_range(self.a_min[i_comp], self.a_max[i_comp])
+            nf_polys.append(self.real_number.evaluate(q))
             if i_comp == self.rod.n_comp-1:
                 nf_polys.append(0.0)
         self.nf_polys = nf_polys
