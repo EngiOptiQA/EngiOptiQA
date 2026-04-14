@@ -44,7 +44,7 @@ class TrussStructureOptimization(TrussStructure):
             self.penalty_weight_joints * self.joint_residuals_poly + \
             self.penalty_weight_volume * self.volume_poly
 
-        self.binary_quadratic_model = Model(self.poly)
+        self.binary_model = Model(self.poly)
 
     def update_penalty_weight_in_objective(self, penalty_weight_joints, penalty_weight_volume, target_volume):
         self.penalty_weight_joints = penalty_weight_joints
@@ -53,4 +53,4 @@ class TrussStructureOptimization(TrussStructure):
             self.penalty_weight_joints * self.joint_residuals_poly + \
             self.penalty_weight_volume * self.volume_poly
 
-        self.binary_quadratic_model = Model(self.poly)
+        self.binary_model = Model(self.poly)
