@@ -127,7 +127,7 @@ class TrussStructure:
         return self.supports
 
 
-    def visualize_truss(self):
+    def visualize(self):
         """
         Visualize the truss structure, including nodes, members, loads, and supports.
         :param truss: Instance of TrussStructure.
@@ -136,7 +136,7 @@ class TrussStructure:
 
         # Plot nodes
         for node_id, (x, y) in self.nodes.items():
-            ax.plot(x, y, 'o', color='black')  # Nodes as black circles
+            ax.plot(x, y, 'o', color='green')  # Nodes as black circles
             ax.text(x - 0.075, y - 0.075, f"{node_id}", fontsize=12)
 
         # Plot members
@@ -168,7 +168,7 @@ class TrussStructure:
         # Custom legend entries
         legend_elements = [
             Line2D([0], [0], color='black', lw=2, label='Members'),
-            Line2D([0], [0], marker='o', color='black', markersize=8, label='Nodes', linestyle='None'),
+            Line2D([0], [0], marker='o', color='green', markersize=8, label='Nodes', linestyle='None'),
             Line2D([0], [0], marker='s', color='blue', markersize=8, label='Supports', linestyle='None'),
             Line2D([0], [0], color='red', lw=2, label='Loads (Scaled)'),
         ]
@@ -467,7 +467,7 @@ class TrussStructure:
         self.poly = self.complementary_energy_poly + \
             self.penalty_weight_joints * self.joint_residuals_poly
 
-        self.binary_quadratic_model = Model(self.poly)
+        self.binary_model = Model(self.poly)
 
     def update_penalty_weight_in_objective(self, penalty_weight_joints):
         self.penalty_weight_joints = penalty_weight_joints
@@ -475,7 +475,7 @@ class TrussStructure:
         self.poly = self.complementary_energy_poly + \
             self.penalty_weight_joints * self.joint_residuals_poly
 
-        self.binary_quadratic_model = Model(self.poly)
+        self.binary_model = Model(self.poly)
 
     def analyze_results(self, results=None):
 
