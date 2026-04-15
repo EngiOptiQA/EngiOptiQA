@@ -177,7 +177,7 @@ class BaseProblem(ABC):
     def get_number_of_continuous_vars(self):
         return self.rod.n_comp
 
-    def update_ranges(self, sol_bit_array, nf, nf_prev, relaxation_factor):
+    def update_ranges(self, sol_bit_array, nf, nf_prev, relaxation_factor, verbose=False):
 
         n_nodes = self.get_number_of_continuous_vars()
         actions = ['' for _ in range(n_nodes)]
@@ -197,7 +197,7 @@ class BaseProblem(ABC):
 
             self.a_min[i_node], self.a_max[i_node], actions[i_node] = self.real_number.update_range(
                 nf[i_node], nf_encoded[i_node], nf_prev[i_node], self.a_min[i_node], self.a_max[i_node],
-                relaxation_factor
+                relaxation_factor, verbose
             )
 
             nf_encoded_new[i_node] = self.real_number.encode_real_to_bits(
@@ -328,18 +328,18 @@ class BaseProblem(ABC):
         self.generate_constraint_polys()
 
         self.penalty_weight_equilibrium = penalty_weight
-        print(f"Effective penalty weight: {self.penalty_weight_equilibrium}\n")
+        print(f"Penalty weight (equilibrium): {self.penalty_weight_equilibrium}\n")
         self.poly = self.complementary_energy_poly + \
             self.penalty_weight_equilibrium * self.equilibrium_constraint_poly
 
         self.binary_model = Model(self.poly)
 
-        output = f'Number of input qubits: {len(self.binary_model.get_variables())}\n'
+        output = f'Number of binary variables: {len(self.binary_model.get_variables())}\n'
         self.print_and_log(output)
 
     def update_penalty_weight_in_problem_formulation(self, penalty_weight = 1.0):
         self.penalty_weight_equilibrium = penalty_weight
-        print(f"Effective penalty weight: {self.penalty_weight_equilibrium}\n")
+        print(f"Penalty weight (equilibrium): {self.penalty_weight_equilibrium}\n")
         self.poly = self.complementary_energy_poly + \
             self.penalty_weight_equilibrium * self.equilibrium_constraint_poly
 
@@ -457,8 +457,8 @@ class BaseProblem(ABC):
         bq = AcceptableDegrees(objective={"Binary": "Quadratic"})
         im, mapping =  self.binary_model.to_intermediate_model(bq, quadratization_method="IshikawaKZFD")
 
-        output = f'Number of input qubits: {len(self.binary_model.get_variables())}\n'
-        output+= f'Number of logical qubits: {len(im.get_variables())}\n'
+        output = f'Number of binary variables (original degree): {len(self.binary_model.get_variables())}\n'
+        output+= f'Number of binary variables (reduced degree) : {len(im.get_variables())}\n'
         self.print_and_log(output)
         coeff_dict = im.objective.asdict()
         constant = coeff_dict.get((), 0.0)
