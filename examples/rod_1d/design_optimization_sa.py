@@ -4,8 +4,8 @@ import numpy as np
 from pathlib import Path
 
 # Make sure the repo root is on the path
-sys.path.append(str(Path(__file__).resolve().parents[2]))
-from engioptiqa import AnnealingSolverDWave, DesignOptimizationProblem, Rod1D
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from engioptiqa import AnnealingSolverDWave, DesignOptimizationProblemRod1D, Rod1D
 
 # Get the directory containing this script
 script_directory = Path(__file__).resolve().parent
@@ -24,7 +24,7 @@ g = 1.5
 # Rod with n_comp components and of length L.
 n_comp = 2; L = 1.5; A_choices = [0.25, 0.5]; rod_1d = Rod1D(n_comp, L)
 
-optimization_problem = DesignOptimizationProblem(rod_1d, g, A_choice=A_choices, output_path=output_path)
+optimization_problem = DesignOptimizationProblemRod1D(rod_1d, g, A_choice=A_choices, output_path=output_path)
 
 # Analytical Solution
 # ===================

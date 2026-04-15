@@ -4,8 +4,8 @@ import numpy as np
 from pathlib import Path
 
 # Make sure the repo root is on the path
-sys.path.append(str(Path(__file__).resolve().parents[2]))
-from engioptiqa import AnnealingSolverDWave, StructuralAnalysisProblem, Rod1D
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from engioptiqa import AnnealingSolverDWave, StructuralAnalysisProblemRod1D, Rod1D
 
 # Get the directory containing this script
 script_directory = Path(__file__).resolve().parent
@@ -24,7 +24,7 @@ g = 2.5
 # Rod with n_comp components and of length L.
 n_comp = 5; L = 1.5; A = 0.25; rod_1d = Rod1D(n_comp, L, A)
 
-analysis_problem = StructuralAnalysisProblem(rod_1d, g, output_path=output_path)
+analysis_problem = StructuralAnalysisProblemRod1D(rod_1d, g, output_path=output_path)
 
 # Analytical Solution
 # ===================
