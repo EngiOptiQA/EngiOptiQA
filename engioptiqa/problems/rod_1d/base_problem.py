@@ -174,18 +174,52 @@ class BaseProblem(ABC):
     def generate_discretization():
         pass
 
-    def update_nodal_force_ranges(self, nf, nf_bit_array, nf_prev):
+    def get_number_of_continuous_vars(self):
+        return self.rod.n_comp
 
-        for i_node in range(self.rod.n_comp):
+    def update_ranges(self, sol_bit_array, nf, nf_prev, relaxation_factor):
+
+        n_nodes = self.get_number_of_continuous_vars()
+        actions = ['' for _ in range(n_nodes)]
+        nf_decoded = [np.nan for _ in range(n_nodes)]
+        nf_decoded_new = [np.nan for _ in range(n_nodes)]
+        nf_encoded = [[] for _ in range(n_nodes)]
+        nf_encoded_new = [[] for _ in range(n_nodes)]
+        for i_node in range(n_nodes):
 
             # Extract bit array for current node
             start = i_node * self.n_qubits_per_node
             end = (i_node + 1) * self.n_qubits_per_node
-            nf_bit_array_node = nf_bit_array[start:end]
+            nf_encoded[i_node] = sol_bit_array[start:end]
 
-            self.a_min[i_node], self.a_max[i_node], actions = self.real_number.update_range(
-                nf[i_node], nf_bit_array_node, nf_prev[i_node], self.a_min[i_node], self.a_max[i_node], 0.25
+            nf_decoded[i_node] = self.real_number.decode_bits_to_real(
+                nf_encoded[i_node], self.a_min[i_node], self.a_max[i_node])
+
+            self.a_min[i_node], self.a_max[i_node], actions[i_node] = self.real_number.update_range(
+                nf[i_node], nf_encoded[i_node], nf_prev[i_node], self.a_min[i_node], self.a_max[i_node],
+                relaxation_factor
             )
+
+            nf_encoded_new[i_node] = self.real_number.encode_real_to_bits(
+                nf[i_node], self.a_min[i_node], self.a_max[i_node])
+
+            nf_decoded_new[i_node] = self.real_number.decode_bits_to_real(
+                nf_encoded_new[i_node], self.a_min[i_node], self.a_max[i_node]
+            )
+
+        return actions, nf_decoded, nf_decoded_new, nf_encoded, nf_encoded_new
+
+    def update_solution(self, sol_bit_array, nf_encoded):
+        n_nodes = self.get_number_of_continuous_vars()
+        for i_node in range(n_nodes):
+            start = i_node * self.n_qubits_per_node
+            end = (i_node + 1) * self.n_qubits_per_node
+            sol_bit_array[start:end] = nf_encoded[i_node]
+        return sol_bit_array
+
+    def update_formulation(self):
+        self.update_nodal_force_polys()
+        self.generate_cross_section_inverse_polys()
 
     def generate_nodal_force_polys(self, n_qubits_per_node, binary_representation, lower_lim=None, upper_lim=None):
         assert(self.variable_generator is not None)
