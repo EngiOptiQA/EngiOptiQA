@@ -151,7 +151,7 @@ class Range(RealNumber):
         self.a_min = a_min
         self.a_max = a_max
 
-    def update_range(self, a, a_bit_array, a_prev, a_min, a_max, relaxation_factor):
+    def update_range(self, a, a_bit_array, a_prev, a_min, a_max, relaxation_factor, verbose=False):
 
         actions = []
         c = relaxation_factor
@@ -165,30 +165,36 @@ class Range(RealNumber):
 
         if a < a_prev:
             a_max = a_max - c*delta_max
-            print("\tLowering upper bound.")
+            if verbose:
+                print("  Lowering upper bound.")
             actions.append("max ▼")
         elif a > a_prev:
             a_min = a_min + c*delta_min
-            print("\tRaising lower bound.")
+            if verbose:
+                print("  Raising lower bound.")
             actions.append("min ▲")
         elif a == a_prev:
             a_min = a - delta * c/4
             a_max = a + delta * c/4
-            print("\tShrinking range.")
+            if verbose:
+                print("  Shrinking range.")
             actions.append("shrink ▶◀")
 
         # Expand range if all qubits at a node are 1 or 0
         if all(b == 1 for b in a_bit_array):
-            print(f"\tAll qubits are 1, expanding range in positive direction.")
+            if verbose:
+                print(f"  All qubits are 1, expanding range in positive direction.")
             a_max += 0.25 * delta
             actions.append("max ▲")
         elif all(b == 0 for b in a_bit_array):
-            print(f"\tAll qubits are 0, expanding range in negative direction.")
+            if verbose:
+                print(f"  All qubits are 0, expanding range in negative direction.")
             a_min -= 0.25 * delta
             actions.append("min ▼")
 
         if old_min != a_min or old_max != a_max:
-            print(f"\tUpdated range: [{a_min}, {a_max}], ({(a_max - a_min):.6e})")
+            if verbose:
+                print(f"  Updated range: [{a_min}, {a_max}], ({(a_max - a_min):.6e})")
         else:
             actions.append("none")
 
