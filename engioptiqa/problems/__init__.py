@@ -1,10 +1,12 @@
+from .problem import Problem
 from .rod_1d import *
-from .truss import *
+from .truss_structure import *
 
 __all__ = [
-    "DesignOptimizationProblem",
+    "DesignOptimizationProblemRod1D",
+    "Problem",
     "Rod1D",
-    "StructuralAnalysisProblem",
+    "StructuralAnalysisProblemRod1D",
     "TrussMember",
     "TrussStructure",
     "TrussStructureOptimization",

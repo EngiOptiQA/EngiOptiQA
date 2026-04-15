@@ -8,3 +8,5 @@ dist/
 
 # Test examples
 examples/rod_1d/results/
+**/playground/
+

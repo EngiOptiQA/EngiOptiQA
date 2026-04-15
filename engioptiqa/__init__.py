@@ -3,7 +3,7 @@ from .problems import *
 __all__ = [
     "AnnealingSolverAmplify",
     "AnnealingSolverDWave",
-    "DesignOptimizationProblem",
+    "DesignOptimizationProblemRod1D",
     "Rod1D",
-    "StructuralAnalysisProblem",
+    "StructuralAnalysisProblemRod1D",
 ]

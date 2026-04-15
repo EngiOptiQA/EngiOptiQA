@@ -1,7 +1,7 @@
 import itertools
-from .base_problem import BaseProblem
+from .base_problem import BaseProblemRod1D
 
-class StructuralAnalysisProblem(BaseProblem):
+class StructuralAnalysisProblemRod1D(BaseProblemRod1D):
     def __init__(self, rod, g, output_path=None):
         super().__init__(rod, g, output_path)
 
@@ -25,9 +25,9 @@ class StructuralAnalysisProblem(BaseProblem):
         output = f'Analytic Force: {self.force_analytic}\n'
         self.print_and_log(output)
 
-    def generate_discretization(self, n_qubits_per_node, binary_representation, lower_lim=None, upper_lim=None):
-        BaseProblem.initialize_discretization(self)
-        BaseProblem.generate_nodal_force_polys(self, n_qubits_per_node, binary_representation, lower_lim, upper_lim)
+    def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
+        BaseProblemRod1D.initialize_discretization(self)
+        BaseProblemRod1D.generate_nodal_force_polys(self, n_qubits_per_var, binary_representation, lower_lim, upper_lim)
         self.generate_cross_section_inverse_polys()
 
     def generate_cross_section_inverse_polys(self):

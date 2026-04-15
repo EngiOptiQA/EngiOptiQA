@@ -8,9 +8,9 @@ import os
 import matplot2tikz
 
 from .rod_1d import Rod1D
-from .base_problem import BaseProblem
+from .base_problem import BaseProblemRod1D
 
-class DesignOptimizationProblem(BaseProblem):
+class DesignOptimizationProblemRod1D(BaseProblemRod1D):
     def __init__(self, rod, g, A_choice, output_path=None):
         super().__init__(rod, g, output_path)
         assert(len(A_choice)==2)
@@ -59,9 +59,9 @@ class DesignOptimizationProblem(BaseProblem):
         output = f'Analytic Force: {self.force_analytic}\n'
         self.print_and_log(output)
 
-    def generate_discretization(self, n_qubits_per_node, binary_representation, lower_lim=None, upper_lim=None):
-        BaseProblem.initialize_discretization(self)
-        BaseProblem.generate_nodal_force_polys(self, n_qubits_per_node, binary_representation, lower_lim, upper_lim)
+    def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
+        BaseProblemRod1D.initialize_discretization(self)
+        BaseProblemRod1D.generate_nodal_force_polys(self, n_qubits_per_var, binary_representation, lower_lim, upper_lim)
         self.generate_cross_section_inverse_polys()
 
     def generate_cross_section_inverse_polys(self):
@@ -89,11 +89,11 @@ class DesignOptimizationProblem(BaseProblem):
 
     def annotate_qubo_matrix_pattern(self):
         for i_node in range(self.rod.n_comp):
-            pos = (i_node+1)*self.n_qubits_per_node - 0.5
+            pos = (i_node+1)*self.n_qubits_per_var - 0.5
             plt.axvline(x=pos, color='gray', linestyle='--', linewidth=0.75)
             plt.axhline(y=pos, color='gray', linestyle='--', linewidth=0.75)
 
-        pos = (self.rod.n_comp)*self.n_qubits_per_node + self.rod.n_comp - 0.5
+        pos = (self.rod.n_comp)*self.n_qubits_per_var + self.rod.n_comp - 0.5
         plt.axvline(x=pos, color='gray', linestyle='dotted', linewidth=0.75)
         plt.axhline(y=pos, color='gray', linestyle='dotted', linewidth=0.75)
 
@@ -104,17 +104,17 @@ class DesignOptimizationProblem(BaseProblem):
         ):
         self.plot_qubo_matrix_pattern()
         self.annotate_qubo_matrix_pattern()
-        plt.xlim(-0.5,((self.rod.n_comp)*(self.n_qubits_per_node+1)-0.5))
-        plt.ylim(((self.rod.n_comp)*(self.n_qubits_per_node)),-0.5)
+        plt.xlim(-0.5,((self.rod.n_comp)*(self.n_qubits_per_var+1)-0.5))
+        plt.ylim(((self.rod.n_comp)*(self.n_qubits_per_var)),-0.5)
 
         if highlight_cross_sections:
             for i_comp in range(self.rod.n_comp-1):
-                x_pos = self.rod.n_comp*self.n_qubits_per_node + i_comp - 0.5
-                y_pos = i_comp*self.n_qubits_per_node - 0.5
+                x_pos = self.rod.n_comp*self.n_qubits_per_var + i_comp - 0.5
+                y_pos = i_comp*self.n_qubits_per_var - 0.5
                 rect = patches.Rectangle(
                     (x_pos,y_pos),
                     1,
-                    2*self.n_qubits_per_node,
+                    2*self.n_qubits_per_var,
                     linewidth = 2,
                     edgecolor='red',
                     facecolor='none'
@@ -123,12 +123,12 @@ class DesignOptimizationProblem(BaseProblem):
 
         if highlight_interactions:
             for i_comp in range(1,self.rod.n_comp):
-                x_pos = self.rod.n_comp*self.n_qubits_per_node + (i_comp-1) - 0.5
-                y_pos = i_comp*self.n_qubits_per_node - 0.5
+                x_pos = self.rod.n_comp*self.n_qubits_per_var + (i_comp-1) - 0.5
+                y_pos = i_comp*self.n_qubits_per_var - 0.5
                 rect = patches.Rectangle(
                     (x_pos,y_pos),
                     2,
-                    self.n_qubits_per_node,
+                    self.n_qubits_per_var,
                     linewidth = 2,
                     edgecolor='orange',
                     facecolor='none'

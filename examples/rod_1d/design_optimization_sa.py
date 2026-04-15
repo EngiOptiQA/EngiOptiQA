@@ -41,9 +41,9 @@ annealing_solver_sa.setup_solver(solver_type='simulated_annealing')
 # Discretization through Binary Representation of Real-Valued Nodal Coefficients and Cross Section Choice
 # -------------------------------------------------------------------------------------------------------
 binary_representation = 'normalized'
-n_qubits_per_node = 3
+n_qubits_per_var = 3
 
-optimization_problem.generate_discretization(n_qubits_per_node, binary_representation)
+optimization_problem.generate_discretization(n_qubits_per_var, binary_representation)
 
 # Problem Formulation Using the Amplify SDK
 # --------------------------------------

@@ -14,19 +14,22 @@ from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 import os
-import pickle
+
 from prettytable import PrettyTable
 from scipy.integrate import quad
 import sympy as sp
 import sys
 
 from engioptiqa.variables.real_number import RealNumber
+from engioptiqa.problems.problem import Problem
 from .rod_1d import Rod1D
-from ..solution_emulator import SolutionEmulator
+
 from types import SimpleNamespace
 
-class BaseProblem(ABC):
+class BaseProblemRod1D(Problem):
     def __init__(self, rod, g, output_path=None):
+        super().__init__(output_path)
+        self.name = 'Base Problem Rod 1D'
         self.rod = rod
         self.g = g
 
@@ -35,29 +38,6 @@ class BaseProblem(ABC):
         self.table = PrettyTable()
         self.table.field_names =\
             ['Cross Sections', 'Complementary Energy', 'Compliance']
-
-        if output_path is None:
-            self.save_fig = False
-        else:
-            self.save_fig = True
-            if not os.path.exists(output_path):
-                os.makedirs(output_path)
-                print(f"Folder '{output_path}' created successfully.")
-            else:
-                print(f"Folder '{output_path}' already exists.")
-            self.log_file = os.path.join(output_path,'log.txt')
-        self.output_path = output_path
-
-    def set_output_path(self, output_path):
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
-            print(f"Folder '{output_path}' created successfully.")
-        else:
-            print(f"Folder '{output_path}' already exists.")
-        self.log_file = os.path.join(output_path,'log.txt')
-        self.output_path = output_path
-
-        self.print_and_log(self.name+'\n')
 
     def analytical_complementary_energy_and_compliance(self, A_combi):
 
@@ -114,12 +94,6 @@ class BaseProblem(ABC):
 
         self.PI_combi, self.C_combi, self.A_combi = PI_combi, C_combi, A_combi
 
-    def print_and_log(self, output):
-        print(output)
-        if hasattr(self, 'log_file'):
-            with open(self.log_file, 'a') as file:
-                file.write(output)
-
     def compute_stress_function(self, rod):
 
         n_comp = rod.n_comp
@@ -167,74 +141,27 @@ class BaseProblem(ABC):
         phi2 = (x_sym-xi)/(xj-xi)
         return phi1, phi2
 
-    def initialize_discretization(self):
-        self.variable_generator = VariableGenerator()
-
-    @abstractmethod
-    def generate_discretization():
-        pass
-
     def get_number_of_continuous_vars(self):
         return self.rod.n_comp
-
-    def update_ranges(self, sol_bit_array, nf, nf_prev, relaxation_factor, verbose=False):
-
-        n_nodes = self.get_number_of_continuous_vars()
-        actions = ['' for _ in range(n_nodes)]
-        nf_decoded = [np.nan for _ in range(n_nodes)]
-        nf_decoded_new = [np.nan for _ in range(n_nodes)]
-        nf_encoded = [[] for _ in range(n_nodes)]
-        nf_encoded_new = [[] for _ in range(n_nodes)]
-        for i_node in range(n_nodes):
-
-            # Extract bit array for current node
-            start = i_node * self.n_qubits_per_node
-            end = (i_node + 1) * self.n_qubits_per_node
-            nf_encoded[i_node] = sol_bit_array[start:end]
-
-            nf_decoded[i_node] = self.real_number.decode_bits_to_real(
-                nf_encoded[i_node], self.a_min[i_node], self.a_max[i_node])
-
-            self.a_min[i_node], self.a_max[i_node], actions[i_node] = self.real_number.update_range(
-                nf[i_node], nf_encoded[i_node], nf_prev[i_node], self.a_min[i_node], self.a_max[i_node],
-                relaxation_factor, verbose
-            )
-
-            nf_encoded_new[i_node] = self.real_number.encode_real_to_bits(
-                nf[i_node], self.a_min[i_node], self.a_max[i_node])
-
-            nf_decoded_new[i_node] = self.real_number.decode_bits_to_real(
-                nf_encoded_new[i_node], self.a_min[i_node], self.a_max[i_node]
-            )
-
-        return actions, nf_decoded, nf_decoded_new, nf_encoded, nf_encoded_new
-
-    def update_solution(self, sol_bit_array, nf_encoded):
-        n_nodes = self.get_number_of_continuous_vars()
-        for i_node in range(n_nodes):
-            start = i_node * self.n_qubits_per_node
-            end = (i_node + 1) * self.n_qubits_per_node
-            sol_bit_array[start:end] = nf_encoded[i_node]
-        return sol_bit_array
 
     def update_formulation(self):
         self.update_nodal_force_polys()
         self.generate_cross_section_inverse_polys()
 
-    def generate_nodal_force_polys(self, n_qubits_per_node, binary_representation, lower_lim=None, upper_lim=None):
+    def generate_nodal_force_polys(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
         assert(self.variable_generator is not None)
         if binary_representation == 'range':
             assert(lower_lim is not None and upper_lim is not None), \
                 "Lower and upper limits must be provided for range representation."
             self.a_min = np.ones(self.rod.n_comp)*lower_lim
             self.a_max = np.ones(self.rod.n_comp)*upper_lim
-        self.n_qubits_per_node = n_qubits_per_node
+        self.n_qubits_per_var = n_qubits_per_var
         self.binary_representation = binary_representation
-        self.real_number = RealNumber(self.n_qubits_per_node, self.binary_representation, lower_lim, upper_lim)
+        self.real_number = RealNumber(self.n_qubits_per_var, self.binary_representation, lower_lim, upper_lim)
 
         nf_polys = []
         for i_comp in range(self.rod.n_comp):
-            q = self.variable_generator.array("Binary", self.n_qubits_per_node)
+            q = self.variable_generator.array("Binary", self.n_qubits_per_var)
             nf_polys.append(self.real_number.evaluate(q))
             if i_comp == self.rod.n_comp-1:
                 nf_polys.append(0.0)
@@ -244,7 +171,7 @@ class BaseProblem(ABC):
         self.initialize_discretization()
         nf_polys = []
         for i_comp in range(self.rod.n_comp):
-            q = self.variable_generator.array("Binary", self.n_qubits_per_node)
+            q = self.variable_generator.array("Binary", self.n_qubits_per_var)
             if self.binary_representation == 'range':
                 self.real_number.set_range(self.a_min[i_comp], self.a_max[i_comp])
             nf_polys.append(self.real_number.evaluate(q))
@@ -345,60 +272,6 @@ class BaseProblem(ABC):
 
         self.binary_model = Model(self.poly)
 
-    def get_qubo_matrix(self):
-        bq = AcceptableDegrees(objective={"Binary": "Quadratic"})
-        im, mapping =  self.binary_model.to_intermediate_model(bq, quadratization_method="IshikawaKZFD")
-        coeff_dict = im.objective.asdict()
-
-        # 1. Determine the number of variables
-        variable_keys = [k for k in coeff_dict.keys() if k]  # remove empty tuple
-        n = max(max(k) for k in variable_keys) + 1 if variable_keys else 0
-
-        # 2. Initialize an NxN matrix of zeros
-        Q = np.zeros((n, n))
-
-        # 3. Fill the matrix
-        for key, value in coeff_dict.items():
-            if key == ():
-                # constant offset, ignore in the matrix
-                continue
-            elif len(key) == 1:
-                # Linear term
-                i = key[0]
-                Q[i, i] = value
-            elif len(key) == 2:
-                # Quadratic term
-                i, j = key
-                Q[i, j] = value
-                Q[j, i] = value  # make it symmetric
-            else:
-                raise ValueError(f"Unexpected key format in dictionary with QUBO coefficients: {key}")
-
-        return Q
-
-    def visualize_qubo_matrix(self, show_fig=False, save_fig=False, save_tikz=False, suffix=''):
-        title = self.name + '\n QUBO Matrix \n'
-
-        print("Generating QUBO matrix for visualization...")
-
-        Q = self.get_qubo_matrix()
-
-        # Visualize the QUBO Matrix.
-        plt.figure()
-        plt.suptitle(title)
-        plt.imshow(Q,interpolation='none')
-        plt.colorbar()
-        if show_fig:
-            plt.show()
-        if save_fig or save_tikz:
-            assert(self.output_path is not None)
-            file_name = os.path.join(self.output_path, self.name.lower().replace(' ', '_') + '_qubo_matrix' + suffix)
-            if save_fig:
-                plt.savefig(file_name, dpi=600)
-            if save_tikz:
-                matplot2tikz.save(file_name + '.tex')
-        plt.close()
-
     def plot_qubo_matrix_pattern(self, highlight_nodes=False, highlight_interactions=False):
         title = self.name + '\n QUBO Pattern \n'
         Q = self.get_qubo_matrix()
@@ -409,12 +282,12 @@ class BaseProblem(ABC):
 
         if highlight_nodes:
             for i_node in range(self.rod.n_comp):
-                x_pos = (i_node)*self.n_qubits_per_node - 0.5
+                x_pos = (i_node)*self.n_qubits_per_var - 0.5
                 y_pos = x_pos
                 rect = patches.Rectangle(
                     (x_pos,y_pos),
-                    self.n_qubits_per_node,
-                    self.n_qubits_per_node,
+                    self.n_qubits_per_var,
+                    self.n_qubits_per_var,
                     linewidth = 2,
                     edgecolor='red',
                     facecolor='none'
@@ -423,12 +296,12 @@ class BaseProblem(ABC):
 
         if highlight_interactions:
             for i_node in range(self.rod.n_comp-1):
-                x_pos = (i_node)*self.n_qubits_per_node - 0.5
+                x_pos = (i_node)*self.n_qubits_per_var - 0.5
                 y_pos = x_pos
                 rect = patches.Rectangle(
                     (x_pos,y_pos),
-                    2*self.n_qubits_per_node,
-                    2*self.n_qubits_per_node,
+                    2*self.n_qubits_per_var,
+                    2*self.n_qubits_per_var,
                     linewidth = 2,
                     edgecolor='orange',
                     facecolor='none'
@@ -451,46 +324,6 @@ class BaseProblem(ABC):
         if show_fig:
             plt.show()
         plt.close()
-
-    def transform_to_dwave(self):
-
-        bq = AcceptableDegrees(objective={"Binary": "Quadratic"})
-        im, mapping =  self.binary_model.to_intermediate_model(bq, quadratization_method="IshikawaKZFD")
-
-        output = f'Number of binary variables (original degree): {len(self.binary_model.get_variables())}\n'
-        output+= f'Number of binary variables (reduced degree) : {len(im.get_variables())}\n'
-        self.print_and_log(output)
-        coeff_dict = im.objective.asdict()
-        constant = coeff_dict.get((), 0.0)
-        linear = {k[0]: v for k, v in coeff_dict.items() if len(k) == 1}
-        quadratic = {tuple(k): v for k, v in coeff_dict.items() if len(k) == 2}
-
-        self.binary_quadratic_model_dwave = BinaryQuadraticModelDWave(linear, quadratic, constant, vartype='BINARY')
-
-    def get_bit_array(self, result):
-        if type(result) is SampleView:
-            bit_array = [int(result[k]) for k in result.keys()]
-        else:
-            bit_array = [int(result.values[k]) for k in result.values.keys()]
-        return bit_array
-
-    def get_energy(self, index):
-        if type(self.results) is SampleSet:
-            return self.results.record[index]['energy']
-        else:
-            if hasattr(self.results[index], 'energy'):
-                return self.results[index].energy
-            else:
-                return np.nan
-
-    def get_frequency(self, index):
-        if type(self.results) is SampleSet:
-            return self.results.record[index]['num_occurrences']
-        else:
-            if hasattr(self.results[index], 'frequency'):
-                return self.results[index].frequency
-            else:
-                return np.nan
 
     def analyze_results(self, results=None, analysis_plots=True, compute_errors=True, result_max=sys.maxsize):
 
@@ -530,7 +363,7 @@ class BaseProblem(ABC):
             solutions[i_result]['objective'] = obj_sol
             solutions[i_result]['energy'] = self.get_energy(i_result)
             solutions[i_result]['frequency'] = self.get_frequency(i_result)
-            solutions[i_result]['nf'] = nf_sol
+            solutions[i_result]['continuous_vars'] = nf_sol
             solutions[i_result]['cs_inv'] = cs_inv_sol
 
             self.objectives.append(obj_sol)
@@ -592,31 +425,6 @@ class BaseProblem(ABC):
 
         return solutions
 
-    def store_results(self):
-        if hasattr(self, 'results'):
-            # Results is of class amplify.SolverResult and stores a list of solutions.
-            # These are of class amplify.SolverSolution and are converted to SolutionEmulator for storing.
-            results = []
-            for result in self.results:
-                results.append(
-                    SolutionEmulator(
-                        energy=result.energy,
-                        frequency=result.frequency,
-                        is_feasible=result.is_feasible,
-                        values=result.values
-                    )
-                )
-            # Store results, i.e., a list of SolutionEmulator objects, each reflecting one solution.
-            results_file = os.path.join(self.output_path, 'results.pkl')
-            with open(results_file, 'wb') as f:
-                pickle.dump(results, f)
-        else:
-            raise Exception('Trying to store results but no results exist.')
-
-    def load_results(self, results_file):
-        with open(results_file, 'rb') as f:
-            self.results = pickle.load(f)
-
     def print_solution_quantities(self, PI_sol, con_eq_sol, con_bc_sol, obj_sol, error_force_abs, error_force_rel):
             output = f'\tComplementary Energy = {PI_sol:.15g} ({self.PI_analytic:.15g})\n'
             output+= f'\tConstraints = {con_eq_sol:.15g} {con_bc_sol:.15g}\n'
@@ -627,20 +435,6 @@ class BaseProblem(ABC):
             output+= f'\tRelative Error = {error_force_rel:.15g}\n'
 
             self.print_and_log(output)
-
-    def decode_amplify_poly_with_bitstring(self, amplify_poly, bitstring):
-
-        poly_dict = amplify_poly.as_dict()
-        value = 0.0
-        for vars_tuple, coeff in poly_dict.items():
-            if len(vars_tuple) == 0:
-                # Constant term
-                term_value = coeff
-            else:
-                # Product of variables in the tuple
-                term_value = coeff * np.prod([bitstring[i] for i in vars_tuple])
-            value += term_value
-        return float(value)
 
     def decode_nodal_force_solution(self, result):
         nf_sol = []

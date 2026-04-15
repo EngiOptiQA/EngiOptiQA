@@ -19,7 +19,7 @@ For the one-dimensional description of a rod under self-weight loading, there ex
 
 .. .. currentmodule:: engioptiqa.problems.rod_1d.base_problem
 
-.. .. autoclass:: BaseProblem
+.. .. autoclass:: BaseProblemRod1D
 
 
 .. Base Problem Methods
@@ -28,7 +28,7 @@ For the one-dimensional description of a rod under self-weight loading, there ex
 .. .. autosummary::
 ..    :toctree: generated/
 
-..    ~BaseProblem.set_output_path
+..    ~BaseProblemRod1D.set_output_path
 
 .. _structural-analysis-problem:
 
@@ -42,7 +42,7 @@ Structural Analysis Problem Class
 
 .. currentmodule:: engioptiqa.problems.rod_1d.structural_analysis_problem
 
-.. autoclass:: StructuralAnalysisProblem
+.. autoclass:: StructuralAnalysisProblemRod1D
 
 
 Structural Analysis Problem Methods
@@ -63,7 +63,7 @@ Design Optimization Problem Class
 
 .. currentmodule:: engioptiqa.problems.rod_1d.design_optimization_problem
 
-.. autoclass:: DesignOptimizationProblem
+.. autoclass:: DesignOptimizationProblemRod1D
 
 
 Design Optimization Problem Methods
