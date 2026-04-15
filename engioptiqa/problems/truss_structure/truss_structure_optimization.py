@@ -34,7 +34,8 @@ class TrussStructureOptimization(TrussStructure):
         self.member_area_polys = member_area_polys
         self.member_area_inv_polys = member_area_inv_polys
 
-    def generate_objective(self, penalty_weight_joints, penalty_weight_volume, target_volume):
+    def generate_problem_formulation(self, penalty_weight_joints):#, penalty_weight_volume, target_volume):
+        penalty_weight_volume = 1e3; target_volume = 0.0
         super().generate_complementary_energy_poly()
         super().generate_joint_residuals_poly()
         super().generate_volume_constraint_poly(target_volume)

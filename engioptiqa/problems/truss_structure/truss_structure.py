@@ -7,12 +7,15 @@ from amplify import (
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
+import sys
 
+from engioptiqa.problems import Problem
 from engioptiqa.variables.real_number import RealNumber
 from .truss_member import TrussMember
 
-class TrussStructure:
-    def __init__(self):
+class TrussStructure(Problem):
+    def __init__(self, output_path = None):
+        super().__init__(output_path)
         self.nodes = {}  # Dictionary to store nodes: {node_id: (x, y)}
         self.n_nodes = 0
         self.members = []  # List to store truss members
@@ -286,63 +289,63 @@ class TrussStructure:
     def initialize_discretization(self):
         self.variable_generator = VariableGenerator()
 
-    def generate_discretization(self, n_qubits_per_member, binary_representation, lower_lim=None, upper_lim=None):
+    def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
         self.initialize_discretization()
-        #self.generate_member_force_polys(n_qubits_per_member, binary_representation, lower_lim, upper_lim)
-        self.generate_member_stress_polys(n_qubits_per_member, binary_representation, lower_lim, upper_lim)
+        #self.generate_member_force_polys(n_qubits_per_var, binary_representation, lower_lim, upper_lim)
+        self.generate_member_stress_polys(n_qubits_per_var, binary_representation, lower_lim, upper_lim)
         self.generate_member_area_inv_polys()
 
-    def generate_member_force_polys(self, n_qubits_per_member, binary_representation, lower_lim=None, upper_lim=None):
+    def get_number_of_continuous_vars(self):
+        return self.n_members
+
+    def update_formulation(self):
+        self.update_member_stress_polys()
+        self.generate_member_area_inv_polys()
+
+    def generate_member_force_polys(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
         assert(self.variable_generator is not None)
         if binary_representation == 'range':
             assert(lower_lim is not None and upper_lim is not None), \
                 "Lower and upper limits must be provided for range representation."
             self.a_min = np.ones(len(self.members))*lower_lim
             self.a_max = np.ones(len(self.members))*upper_lim
-        self.n_qubits_per_member = n_qubits_per_member
+        self.n_qubits_per_var = n_qubits_per_var
         self.binary_representation = binary_representation
-        self.real_number = RealNumber(self.n_qubits_per_member, self.binary_representation)
+        self.real_number = RealNumber(self.n_qubits_per_var, self.binary_representation, lower_lim, upper_lim)
 
         member_force_polys = []
         for i_member, member in enumerate(self.members):
             # print(f'member {i_member} ({member.node_id_0}, {member.node_id_1})')
-            q = self.variable_generator.array("Binary", self.n_qubits_per_member)
-            if binary_representation == 'range':
-                member_force_polys.append(self.real_number.evaluate(q, self.a_min[i_member], self.a_max[i_member]))
-            else:
-                member_force_polys.append(self.real_number.evaluate(q))
+            q = self.variable_generator.array("Binary", self.n_qubits_per_var)
+            member_force_polys.append(self.real_number.evaluate(q))
         self.member_force_polys = member_force_polys
 
-    def generate_member_stress_polys(self, n_qubits_per_member, binary_representation, lower_lim=None, upper_lim=None):
+    def generate_member_stress_polys(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
         assert(self.variable_generator is not None)
         if binary_representation == 'range':
             assert(lower_lim is not None and upper_lim is not None), \
                 "Lower and upper limits must be provided for range representation."
             self.a_min = np.ones(len(self.members))*lower_lim
             self.a_max = np.ones(len(self.members))*upper_lim
-        self.n_qubits_per_member = n_qubits_per_member
+        self.n_qubits_per_var = n_qubits_per_var
         self.binary_representation = binary_representation
-        self.real_number = RealNumber(self.n_qubits_per_member, self.binary_representation)
+        self.real_number = RealNumber(self.n_qubits_per_var, self.binary_representation, lower_lim, upper_lim)
 
         member_stress_polys = []
         for i_member, member in enumerate(self.members):
             # print(f'member {i_member} ({member.node_id_0}, {member.node_id_1})')
-            q = self.variable_generator.array("Binary", self.n_qubits_per_member)
-            if binary_representation == 'range':
-                member_stress_polys.append(self.real_number.evaluate(q, self.a_min[i_member], self.a_max[i_member]))
-            else:
-                member_stress_polys.append(self.real_number.evaluate(q))
+            q = self.variable_generator.array("Binary", self.n_qubits_per_var)
+            member_stress_polys.append(self.real_number.evaluate(q))
         self.member_stress_polys = member_stress_polys
 
     def update_member_stress_polys(self):
         self.initialize_discretization()
         member_stress_polys = []
         for i_member, member in enumerate(self.members):
-            q = self.variable_generator.array("Binary", self.n_qubits_per_member)
+            q = self.variable_generator.array("Binary", self.n_qubits_per_var)
             if self.binary_representation == 'range':
-                member_stress_polys.append(self.real_number.evaluate(q, self.a_min[i_member], self.a_max[i_member]))
-            else:
-                member_stress_polys.append(self.real_number.evaluate(q))
+                self.real_number.set_range(self.a_min[i_member], self.a_max[i_member])
+            member_stress_polys.append(self.real_number.evaluate(q))
         self.member_stress_polys = member_stress_polys
 
     def generate_member_area_inv_polys(self):
@@ -460,7 +463,7 @@ class TrussStructure:
         member_areas = self.member_area_polys
         self.joint_residuals_poly = self.joint_residuals_squared(member_forces, member_stresses, member_areas)
 
-    def generate_objective(self, penalty_weight_joints):
+    def generate_problem_formulation(self, penalty_weight_joints):
         self.generate_complementary_energy_poly()
         self.generate_joint_residuals_poly()
         self.penalty_weight_joints = penalty_weight_joints
@@ -477,7 +480,7 @@ class TrussStructure:
 
         self.binary_model = Model(self.poly)
 
-    def analyze_results(self, results=None):
+    def analyze_results(self, results=None, analysis_plots=True, compute_errors=True, result_max=sys.maxsize):
 
         if results is None and not hasattr(self, 'results'):
             raise Exception('Attempt to analyze results, but no results exist or have been passed.')
@@ -487,6 +490,7 @@ class TrussStructure:
         solutions = [{'objective': np.inf} for _ in range(len(results))]
         best_solution = None
         for i_result, result in enumerate(results):
+            bit_array = self.get_bit_array(result)
             #member_forces_sol = self.decode_member_force_solution(result)
             member_forces_sol = None
             member_stresses_sol = self.decode_member_stress_solution(result)
@@ -499,8 +503,9 @@ class TrussStructure:
             if best_solution is None or objectives_sol < best_solution['objective']:
                 best_solution = solutions[i_result]
 
+            solutions[i_result]['bit_array'] = bit_array
             solutions[i_result]['member_forces'] = member_forces_sol
-            solutions[i_result]['member_stresses'] = member_stresses_sol
+            solutions[i_result]['continuous_vars'] = member_stresses_sol
             solutions[i_result]['member_areas'] = member_areas_sol
             solutions[i_result]['complementary_energy'] = complementary_energy_sol
             solutions[i_result]['volume'] = volume_sol
@@ -514,10 +519,10 @@ class TrussStructure:
         print(f"Volume: {best_solution['volume']}")
         print(f"Joint Residuals (squared): {best_solution['joint_residuals_squared']}")
         print(f"Member Forces: {best_solution['member_forces']}")
-        print(f"Member Stresses: {best_solution['member_stresses']}")
+        print(f"Member Stresses: {best_solution['continuous_vars']}")
         print(f"Member Areas: {best_solution['member_areas']}")
 
-        return best_solution, solutions
+        return solutions
 
     def decode_member_force_solution(self, result):
         member_force_sol = []

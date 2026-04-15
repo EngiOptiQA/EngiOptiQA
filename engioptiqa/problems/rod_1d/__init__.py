@@ -1,9 +1,9 @@
-from .design_optimization_problem import DesignOptimizationProblem
+from .design_optimization_problem import DesignOptimizationProblemRod1D
 from .rod_1d import Rod1D
-from .structural_analysis_problem import StructuralAnalysisProblem
+from .structural_analysis_problem import StructuralAnalysisProblemRod1D
 
 __all__ = [
-    "DesignOptimizationProblem",
+    "DesignOptimizationProblemRod1D",
     "Rod1D",
-    "StructuralAnalysisProblem",
+    "StructuralAnalysisProblemRod1D",
 ]
