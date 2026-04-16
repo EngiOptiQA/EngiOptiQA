@@ -20,7 +20,7 @@ class BruteForceSolver:
                 objective += coeff
         return objective
 
-    def solve_problem(self, problem):
+    def sample_objective(self, problem):
         model = problem.binary_model
         num_vars = len(model.variables)
         if num_vars > self.max_vars:
@@ -29,12 +29,23 @@ class BruteForceSolver:
 
         best_solution = None
         best_objective_value = float('inf')
+        solutions = []
         for binary_solution in itertools.product([0, 1], repeat=num_vars):
             objective_value = self.objective_from_pubo(model.objective.as_dict(), binary_solution)
+            binary_solution_dict = {i: binary_solution[i] for i in range(num_vars)}
+            solution = SimpleNamespace(values=binary_solution_dict, energy=objective_value, frequency=1)
+            solutions.append(solution)
+
 
             if objective_value < best_objective_value:
                 best_objective_value = objective_value
                 best_solution = binary_solution
 
         best_solution_dict = {i: best_solution[i] for i in range(num_vars)}
-        problem.results = [SimpleNamespace(values=best_solution_dict, energy=best_objective_value, frequency=1)]
+        best_solution = SimpleNamespace(values=best_solution_dict, energy=best_objective_value, frequency=1)
+
+        return solutions, best_solution
+
+    def solve_problem(self, problem):
+        solutions, best_solution = self.sample_objective(problem)
+        problem.results = [best_solution]
