@@ -3,7 +3,7 @@ from amplify import (
     Poly,
     VariableGenerator,
 )
-
+from dimod.views.samples import SampleView
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
@@ -130,7 +130,7 @@ class TrussStructure(Problem):
         return self.supports
 
 
-    def visualize(self):
+    def visualize(self, subtitle=''):
         """
         Visualize the truss structure, including nodes, members, loads, and supports.
         :param truss: Instance of TrussStructure.
@@ -144,7 +144,7 @@ class TrussStructure(Problem):
 
         # Plot members
         A_max = max([member.A for member in self.members if member.A is not None]) if any(member.A is not None for member in self.members) else 1.0
-        print(f'Max Area: {A_max}')
+        # print(f'Max Area: {A_max}')
 
         for member in self.members:
             x0, y0 = member.get_coords(local_node_id = 0)
@@ -184,7 +184,7 @@ class TrussStructure(Problem):
         ax.grid(True)
         plt.xlabel("X")
         plt.ylabel("Y")
-        plt.title("Truss Structure Visualization")
+        plt.title("Truss Structure: " + subtitle)
         plt.show()
 
     def compute_member_forces(self):
@@ -441,15 +441,15 @@ class TrussStructure(Problem):
 
         cons_bc = 0.0
         for i_node in range(self.n_nodes):
-            print(f'Node {i_node}')
+            # print(f'Node {i_node}')
             x_fixed = y_fixed = False
             if i_node in self.supports.keys():
                 x_fixed, y_fixed = self.supports[i_node]
             if not x_fixed:
-                print(f'\tResidual force in x-direction: {joint_forces_x[i_node]}')
+                # print(f'\tResidual force in x-direction: {joint_forces_x[i_node]}')
                 cons_bc += joint_forces_x[i_node]**2
             if not y_fixed:
-                print(f'\tResidual force in y-direction:  {joint_forces_y[i_node]}')
+                # print(f'\tResidual force in y-direction:  {joint_forces_y[i_node]}')
                 cons_bc += joint_forces_y[i_node]**2
 
 
@@ -533,20 +533,29 @@ class TrussStructure(Problem):
     def decode_member_stress_solution(self, result):
         member_stress_sol = []
         for member_stress_poly in self.member_stress_polys:
-            member_stress_sol.append(member_stress_poly.decode(result.values))
+            if type(result) is SampleView:
+                member_stress_sol.append(self.decode_amplify_poly_with_bitstring(member_stress_poly,result._data))
+            else:
+                member_stress_sol.append(member_stress_poly.decode(result.values))
         return member_stress_sol
 
     def decode_member_area_solution(self, result):
         member_area_sol = []
         for member_area_poly in self.member_area_polys:
             if isinstance(member_area_poly, Poly):
-                member_area_sol.append(member_area_poly.decode(result.values))
+                if type(result) is SampleView:
+                    member_area_sol.append(self.decode_amplify_poly_with_bitstring(member_area_poly,result._data))
+                else:
+                    member_area_sol.append(member_area_poly.decode(result.values))
             else:
                 member_area_sol.append(member_area_poly)
         member_area_inv_sol = []
         for member_area_inv_poly in self.member_area_inv_polys:
             if isinstance(member_area_inv_poly, Poly):
-                member_area_inv_sol.append(member_area_inv_poly.decode(result.values))
+                if type(result) is SampleView:
+                    member_area_inv_sol.append(self.decode_amplify_poly_with_bitstring(member_area_inv_poly,result._data))
+                else:
+                    member_area_inv_sol.append(member_area_inv_poly.decode(result.values))
             else:
                 member_area_inv_sol.append(member_area_inv_poly)
         return member_area_sol, member_area_inv_sol
