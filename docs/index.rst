@@ -37,7 +37,7 @@ Problems Module
 ===============
 
 This modules provides classes for setting up *PUBO* problems.
-So far, this includes the one-dimensional problem of a rod.
+So far, this includes the one-dimensional problem of a rod and a truss structure problem.
 
 .. toctree::
    :maxdepth: 2
