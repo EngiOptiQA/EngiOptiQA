@@ -7,6 +7,6 @@ dist/
 **/__pycache__/
 
 # Test examples
-examples/rod_1d/results/
+examples/**/results/
 **/playground/
 
