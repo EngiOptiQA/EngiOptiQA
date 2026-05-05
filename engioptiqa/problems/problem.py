@@ -7,10 +7,7 @@ import matplot2tikz
 from matplotlib import pyplot as plt
 import numpy as np
 import os
-# import pickle
 import sys
-
-# from .solution_emulator import SolutionEmulator
 
 class Problem(ABC):
     def __init__(self, output_path = None):
@@ -56,15 +53,16 @@ class Problem(ABC):
     def generate_discretization(self):
         pass
 
-    @abstractmethod
-    def get_number_of_continuous_vars(self):
-        pass
-
     # Support for adaptive encoding of continuous variables
     # -----------------------------------------------------
+    def get_number_of_continuous_vars(self):
+        return 0
+
     def update_ranges(self, sol_bit_array, sol, sol_prev, relaxation_factor, verbose=False):
 
         n_vars = self.get_number_of_continuous_vars()
+        if n_vars == 0:
+            raise Exception('Attempt to update ranges, but number of continuous variables is zero.')
         actions = ['' for _ in range(n_vars)]
         sol_decoded = [np.nan for _ in range(n_vars)]
         sol_decoded_new = [np.nan for _ in range(n_vars)]
@@ -221,31 +219,6 @@ class Problem(ABC):
             solutions[i_result]['frequency'] = self.get_frequency(i_result)
 
         return solutions
-
-    # def store_results(self):
-    #     if hasattr(self, 'results'):
-    #         # Results is of class amplify.SolverResult and stores a list of solutions.
-    #         # These are of class amplify.SolverSolution and are converted to SolutionEmulator for storing.
-    #         results = []
-    #         for result in self.results:
-    #             results.append(
-    #                 SolutionEmulator(
-    #                     energy=result.energy,
-    #                     frequency=result.frequency,
-    #                     is_feasible=result.is_feasible,
-    #                     values=result.values
-    #                 )
-    #             )
-    #         # Store results, i.e., a list of SolutionEmulator objects, each reflecting one solution.
-    #         results_file = os.path.join(self.output_path, 'results.pkl')
-    #         with open(results_file, 'wb') as f:
-    #             pickle.dump(results, f)
-    #     else:
-    #         raise Exception('Trying to store results but no results exist.')
-
-    # def load_results(self, results_file):
-    #     with open(results_file, 'rb') as f:
-    #         self.results = pickle.load(f)
 
     def decode_amplify_poly_with_bitstring(self, amplify_poly, bitstring):
 
