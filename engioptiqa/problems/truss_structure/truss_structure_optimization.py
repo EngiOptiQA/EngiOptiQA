@@ -37,7 +37,7 @@ class TrussStructureOptimization(TrussStructure):
             con_volume = self.total_volume(member_areas)/overall_mean_of_means
         self.volume_poly = con_volume**2
 
-    def generate_problem_formulation(self, penalty_weight):#, penalty_weight_volume, target_volume):
+    def generate_problem_formulation(self, penalty_weight):
         super().generate_complementary_energy_poly()
         super().generate_joint_residuals_poly()
         self.generate_volume_constraint_poly()
