@@ -7,7 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'EngiOptiQA'
-copyright = '2024, Fabian Key'
+copyright = '2026, Fabian Key'
 author = 'Fabian Key'
 
 # -- General configuration ---------------------------------------------------

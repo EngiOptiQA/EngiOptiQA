@@ -4,7 +4,7 @@
 Truss Structure Problems
 ============================
 
-For the a truss structure, there exist two problem formulations:
+For the analysis or optimization of truss structures, there exist two problem formulations:
 
 1. :ref:`Structural Analysis Problem <structural-analysis-problem>`
 2. :ref:`Design Optimization Problem <design-optimization-problem>`
