@@ -480,6 +480,10 @@ class TrussStructure(Problem):
         print(f"Member Forces: {best_solution['member_forces']}")
         print(f"Member Stresses: {best_solution['continuous_vars']}")
         print(f"Member Areas: {best_solution['member_areas']}")
+        if hasattr(self, 'ts_ref'):
+            print(f"Average Relative Error in Member Forces: {best_solution['avg_rel_error_forces']}")
+            print(f"Relative Error in Compliance: {best_solution['rel_error_compliance']}")
+            print(f"Areas Matching Reference Solution: {best_solution['areas_matching']}")
 
         return solutions
 
