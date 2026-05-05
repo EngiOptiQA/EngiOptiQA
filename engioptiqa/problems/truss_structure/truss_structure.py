@@ -330,14 +330,11 @@ class TrussStructure(Problem):
             member_stress_polys.append(self.real_number.evaluate(q))
         self.member_stress_polys = member_stress_polys
 
-    def generate_member_area_inv_polys(self):
+    def generate_member_area_polys(self):
         member_area_polys = []
-        member_area_inv_polys = []
         for member in self.members:
             member_area_polys.append(member.A)
-            member_area_inv_polys.append(1./member.A)
         self.member_area_polys = member_area_polys
-        self.member_area_inv_polys = member_area_inv_polys
 
     def complementary_energy(self, member_stresses, member_areas):
         U = []
