@@ -8,4 +8,6 @@ Problems
 
    rod_1d_problems
 
+   truss_structure
+
 
