@@ -39,6 +39,9 @@ class BaseProblemRod1D(Problem):
         self.table.field_names =\
             ['Cross Sections', 'Complementary Energy', 'Compliance']
 
+    def capabilities(self):
+        return super().capabilities() | {"outeropt_penalty"}
+
     def analytical_complementary_energy_and_compliance(self, A_combi):
 
         n_comp = self.rod.n_comp

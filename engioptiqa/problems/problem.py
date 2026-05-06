@@ -30,6 +30,11 @@ class Problem(ABC):
 
         self.name = 'EngiOptiQA Problem'
 
+    # Support of external codes (e.g., penalty methods, etc.)
+    def capabilities(self) -> set:
+        # default: no external codes
+        return set()
+
     # I/O
     # ---
     def set_output_path(self, output_path):

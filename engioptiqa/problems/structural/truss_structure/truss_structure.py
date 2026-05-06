@@ -31,6 +31,9 @@ class TrussStructure(Problem):
 
         self.penalty_weight = 0.0
 
+    def capabilities(self):
+        return super().capabilities() | {"outeropt_penalty"}
+
     def add_node(self, node_id, coordinates):
         """
         Add a node to the truss structure.
