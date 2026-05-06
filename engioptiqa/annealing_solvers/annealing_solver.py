@@ -1,7 +1,12 @@
 from abc import ABC, abstractmethod
 
 class AnnealingSolver(ABC):
+    """
+    Abstract base class for annealing solvers.
 
+    :param token_file: Optional path to a file containing an API token for authentication.
+    :param proxy: Optional address of a proxy server
+    """
     def __init__(self, token_file=None, proxy=None):
         self.proxy = proxy
         if token_file is not None:

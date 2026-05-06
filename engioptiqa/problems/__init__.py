@@ -1,6 +1,6 @@
 from .problem import Problem
-from .rod_1d import *
-from .truss_structure import *
+from .structural.rod_1d import *
+from .structural.truss_structure import *
 
 __all__ = [
     "DesignOptimizationProblemRod1D",

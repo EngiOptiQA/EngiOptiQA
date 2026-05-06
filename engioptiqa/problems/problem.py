@@ -10,6 +10,11 @@ import os
 import sys
 
 class Problem(ABC):
+    """
+    Abstract base class for EngiOptiQA problems.
+
+    :param output_path: Optional path for saving results.
+    """
     def __init__(self, output_path = None):
         if output_path is None:
             self.save_fig = False

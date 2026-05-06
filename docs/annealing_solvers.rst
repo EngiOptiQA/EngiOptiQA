@@ -4,57 +4,57 @@
 Annealing Solvers
 ============================
 
-.. Annealing Solver
-.. ================
+Annealing Solvers
+=================
 
-.. .. automodule::  engioptiqa.annealing_solvers
+.. automodule::  engioptiqa.annealing_solvers
 
-.. Annealing Solver Class
-.. ----------------------
+Annealing Solvers Base Class
+----------------------------
 
-.. .. currentmodule:: engioptiqa.annealing_solvers.annealing_solver
+.. currentmodule:: engioptiqa.annealing_solvers.annealing_solver
 
-.. .. autoclass:: AnnealingSolver
+.. autoclass:: AnnealingSolver
 
 
-.. Annealing Solver Methods
-.. ------------------------
+.. Annealing Solvers Methods
+.. -------------------------
 
 .. .. autosummary::
 ..    :toctree: generated/
 
-Annealing Solver Amplify
-========================
+Annealing Solvers Amplify
+=========================
 
 .. automodule::  engioptiqa.annealing_solvers.annealing_solver_amplify
 
-Annealing Solver Amplify Class
-------------------------------
+Annealing Solvers Amplify Class
+-------------------------------
 
 .. currentmodule:: engioptiqa.annealing_solvers.annealing_solver_amplify
 
 .. autoclass:: AnnealingSolverAmplify
 
-Annealing Solver Amplify Methods
---------------------------------
+.. Annealing Solvers Amplify Methods
+.. ---------------------------------
 
-.. autosummary::
-   :toctree: generated/
+.. .. autosummary::
+..    :toctree: generated/
 
-Annealing Solver DWave
-========================
+Annealing Solvers DWave
+=======================
 
 .. automodule::  engioptiqa.annealing_solvers.annealing_solver_dwave
 
-Annealing Solver DWave Class
-------------------------------
+Annealing Solvers DWave Class
+-----------------------------
 
 .. currentmodule:: engioptiqa.annealing_solvers.annealing_solver_dwave
 
 .. autoclass:: AnnealingSolverDWave
 
-Annealing Solver DWave Methods
---------------------------------
+.. Annealing Solvers DWave Methods
+.. -------------------------------
 
-.. autosummary::
-   :toctree: generated/
+.. .. autosummary::
+..    :toctree: generated/

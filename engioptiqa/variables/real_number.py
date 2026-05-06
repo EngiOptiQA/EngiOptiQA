@@ -120,6 +120,9 @@ class RealPositive(RealNumber):
         return a
 
 class Normalized(RealNumber):
+    """
+    Normalized representation of a real number in the range [0, 1].
+    """
     def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None):
         self.n_qubits = n_qubits
 
@@ -129,6 +132,9 @@ class Normalized(RealNumber):
         return a
 
 class Range(RealNumber):
+    """
+    Range representation of a real number in the range [a_min, a_max].
+    """
     def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None):
         self.n_qubits = n_qubits
         self.a_min = a_min

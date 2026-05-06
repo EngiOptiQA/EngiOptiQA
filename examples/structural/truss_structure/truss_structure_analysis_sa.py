@@ -4,7 +4,7 @@ import numpy as np
 from pathlib import Path
 
 # Make sure the repo root is on the path
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from engioptiqa import AnnealingSolverDWave, TrussStructure
 
 # Get the directory containing this script
