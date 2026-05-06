@@ -207,7 +207,10 @@ class TrussStructure(Problem):
         plt.xlabel("X")
         plt.ylabel("Y")
         plt.title("Truss Structure: " + subtitle)
-        plt.show()
+        if self.output_path is not None:
+            plt.savefig(self.output_path / f"truss_structure_{subtitle.lower().replace(' ', '_')}.png", dpi=600)
+        else:
+            plt.show()
 
     def compute_member_forces(self):
         """
