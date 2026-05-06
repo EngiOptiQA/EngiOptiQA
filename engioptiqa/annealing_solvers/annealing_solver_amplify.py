@@ -7,10 +7,11 @@ from .annealing_solver import AnnealingSolver
 
 class AnnealingSolverAmplify(AnnealingSolver):
     """
-        Initialize the Annealing Solver that uses the Amplify SDK.
+        Annealing solver that uses the Amplify SDK.
 
         :param client_type: The client type.
         :param token_file: The path of the file that includes the token for the Fixstars Amplify Annealing Engine.
+        :param proxy: Optional address of a proxy server
     """
     def __init__(self, client_type, token_file, proxy=None):
         self.client_type = client_type

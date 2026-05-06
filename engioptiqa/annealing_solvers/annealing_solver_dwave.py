@@ -5,7 +5,13 @@ from dwave.system import DWaveSampler, EmbeddingComposite, LeapHybridSampler
 from .annealing_solver import AnnealingSolver
 
 class AnnealingSolverDWave(AnnealingSolver):
+    """
+        Annealing solver that uses the D-Wave Ocean SDK.
 
+        :param token_file: Optional path to a file containing an API token for authentication.
+        :param proxy: Optional address of a proxy server.
+        :param region: Optional D-Wave solver API region
+    """
     def __init__(self, token_file=None, proxy=None, region=None):
         self.client_type = 'dwave'
         self.region = region

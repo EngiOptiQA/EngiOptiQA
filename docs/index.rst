@@ -37,12 +37,14 @@ Problems Module
 ===============
 
 This modules provides classes for setting up *PUBO* problems.
-So far, this includes the one-dimensional problem of a rod and a truss structure problem.
+There exists a general abstract problem class, which can be used for the implementation of specific problem formulations.
+So far, this includes structural problems such as the analysis and design optimization of a one-dimensional rod or truss
+structures.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
 
-   problems
+   problems/problems
 
 .. _variables-module:
 

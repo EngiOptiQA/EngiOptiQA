@@ -16,17 +16,24 @@ Real Number Class
 
 .. autoclass:: RealNumber
 
-
-.. Real Number Attributes
-.. -----------------------
+.. Real Number Methods
+.. --------------------
 
 .. .. autosummary::
 ..    :toctree: generated/
 
-..    ~RealNumber.adj
+Normalized Class
+-----------------
 
-Real Number  Methods
---------------------
+.. currentmodule:: engioptiqa.variables.real_number
 
-.. autosummary::
-   :toctree: generated/
+.. autoclass:: Normalized
+   :members:
+
+Range Class
+-----------
+
+.. currentmodule:: engioptiqa.variables.real_number
+
+.. autoclass:: Range
+   :members:

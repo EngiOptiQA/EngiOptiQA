@@ -15,6 +15,12 @@ from .truss_member import TrussMember
 
 class TrussStructure(Problem):
     def __init__(self, output_path = None):
+        """
+        Class representing a truss structure analysis problem.
+
+        :param output_path: Optional path for saving results.
+        """
+
         super().__init__(output_path)
         self.nodes = {}  # Dictionary to store nodes: {node_id: (x, y)}
         self.n_nodes = 0
@@ -28,6 +34,7 @@ class TrussStructure(Problem):
     def add_node(self, node_id, coordinates):
         """
         Add a node to the truss structure.
+
         :param node_id: Unique identifier for the node (e.g., integer or string).
         :param coordinates: Tuple (x, y) representing the node's position.
         """
@@ -37,6 +44,7 @@ class TrussStructure(Problem):
     def add_member(self, node_0_id, node_1_id, A=None, E=None, member_id=None):
         """
         Add a truss member to the structure.
+
         :param node_0_id: ID of the first node.
         :param node_1_id: ID of the second node.
         :param A: Cross-sectional area of the member (optional).
@@ -55,6 +63,7 @@ class TrussStructure(Problem):
     def set_member_areas(self, member_areas):
         """
         Set the cross-sectional areas for all members.
+
         :param member_areas: List of areas corresponding to each member.
         """
         if len(member_areas) != self.n_members:
@@ -72,6 +81,7 @@ class TrussStructure(Problem):
     def get_member_info(self):
         """
         Retrieve information about all members in the structure.
+
         :return: List of dictionaries containing member properties.
         """
         member_info = []
@@ -93,6 +103,7 @@ class TrussStructure(Problem):
     def get_node_info(self):
         """
         Retrieve information about all nodes in the structure.
+
         :return: Dictionary of node IDs and their coordinates.
         """
         return self.nodes
@@ -100,6 +111,7 @@ class TrussStructure(Problem):
     def add_load(self, node_id, force):
         """
         Add an external load to a node.
+
         :param node_id: ID of the node where the load is applied.
         :param force: Tuple (Fx, Fy) representing the force components in x and y directions.
         """
@@ -111,6 +123,7 @@ class TrussStructure(Problem):
     def get_load_info(self):
         """
         Retrieve information about all loads in the structure.
+
         :return: Dictionary of node IDs and their applied forces.
         """
         return self.loads
@@ -118,6 +131,7 @@ class TrussStructure(Problem):
     def add_support(self, node_id, x_fixed=True, y_fixed=True):
         """
         Add a support condition to a node.
+
         :param node_id: ID of the node where the support is applied.
         :param x_fixed: Boolean indicating if the x-direction is fixed (default: True).
         :param y_fixed: Boolean indicating if the y-direction is fixed (default: True).
@@ -130,6 +144,7 @@ class TrussStructure(Problem):
     def get_support_info(self):
         """
         Retrieve information about all supports in the structure.
+
         :return: Dictionary of node IDs and their support conditions.
         """
         return self.supports
@@ -137,7 +152,8 @@ class TrussStructure(Problem):
     def visualize(self, subtitle=''):
         """
         Visualize the truss structure, including nodes, members, loads, and supports.
-        :param truss: Instance of TrussStructure.
+
+        :param subtitle: Subtitle for the plot.
         """
         fig, ax = plt.subplots(figsize=(8, 6))
 
