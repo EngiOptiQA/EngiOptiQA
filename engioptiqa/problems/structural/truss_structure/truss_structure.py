@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
 import sys
+from types import SimpleNamespace
 
 from engioptiqa.problems import Problem
 from engioptiqa.variables.real_number import RealNumber
@@ -511,7 +512,10 @@ class TrussStructure(Problem):
         for member_stress_poly in self.member_stress_polys:
             if type(result) is SampleView:
                 member_stress_sol.append(self.decode_amplify_poly_with_bitstring(member_stress_poly,result._data))
+            elif type(result) is SimpleNamespace:
+                member_stress_sol.append(self.decode_amplify_poly_with_bitstring(member_stress_poly,result.values))
             else:
+                print(type(result))
                 member_stress_sol.append(member_stress_poly.decode(result.values))
         return member_stress_sol
 
@@ -521,6 +525,8 @@ class TrussStructure(Problem):
             if isinstance(member_area_poly, Poly):
                 if type(result) is SampleView:
                     member_area_sol.append(self.decode_amplify_poly_with_bitstring(member_area_poly,result._data))
+                elif type(result) is SimpleNamespace:
+                    member_area_sol.append(self.decode_amplify_poly_with_bitstring(member_area_poly,result.values))
                 else:
                     member_area_sol.append(member_area_poly.decode(result.values))
             else:
