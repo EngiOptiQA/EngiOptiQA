@@ -56,6 +56,9 @@ class Problem(ABC):
 
     @abstractmethod
     def generate_discretization(self):
+        """
+        Discretize problem variables into binary representation.
+        """
         pass
 
     # Support for adaptive encoding of continuous variables
@@ -109,6 +112,10 @@ class Problem(ABC):
     # -------------------------------------------------------------------------
     @abstractmethod
     def generate_problem_formulation(self):
+        """
+        Generate problem formulation as an Amplify `Model` based on a polynomial in binary variables for the objective
+        to be minimized including constraints.
+        """
         pass
 
     # QUBO
@@ -209,7 +216,15 @@ class Problem(ABC):
             else:
                 return np.nan
 
-    def analyze_results(self, results=None, analysis_plots=True, compute_errors=True, result_max=sys.maxsize):
+    def analyze_results(self, results=None):
+        """
+        Analyze results computed or returned by a solver.
+
+        :param results: Optional results to analyze. If not provided, will attempt to use `self.results` computed by
+            a solver.
+
+        :return: List of solutions (dictionaries) containing information (bit array, energy, frequency).
+        """
         if results is None and not hasattr(self, 'results'):
             raise Exception('Attempt to analyze results, but no results exist or have been passed.')
         elif results is None and hasattr(self, 'results'):
