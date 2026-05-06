@@ -16,7 +16,7 @@ output_path = results_root / datetime.now().strftime("%Y_%m_%d_%H-%M-%S")
 output_path.mkdir(parents=True, exist_ok=True)
 print(f"Created output folder: {output_path}")
 
-def create_truss_structure_3_elements(ts, A, E, load, visualize=True, subtitle=''):
+def create_truss_structure_2_elements(ts, A, E, load, visualize=True, subtitle=''):
     ts.add_node(0, (0,0))  # Node 0 at (0,0)
     ts.add_node(1, (1,0))  # Node 1 at (1,0)
     ts.add_node(2, (0,1))  # Node 2 at (0,1)
@@ -40,12 +40,12 @@ def create_truss_structure_3_elements(ts, A, E, load, visualize=True, subtitle='
 A = 0.5; E = 2e11; load = (0, -100e3)
 
 ts = TrussStructure(output_path=output_path)
-create_truss_structure_3_elements(ts, A, E, load, visualize=False, subtitle='Reference')
+create_truss_structure_2_elements(ts, A, E, load, visualize=False, subtitle='Reference')
 
 # Reference Solution
 # ==================
 ts_ref = TrussStructure()
-create_truss_structure_3_elements(ts_ref, A, E, load, visualize=False, subtitle='Reference')
+create_truss_structure_2_elements(ts_ref, A, E, load, visualize=False, subtitle='Reference')
 ts.set_reference_solution(ts_ref)
 
 # Numerical Solution
