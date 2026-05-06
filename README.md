@@ -22,7 +22,7 @@ Run this example for the design optimization of a rod under self-weight loading 
 
 ```bash
 pip install -r requirements.txt
-python3 examples/rod_1d/design_optimization_sa.py
+python3 examples/structural/rod_1d/design_optimization_sa.py
 ```
 
 The expected $H_1$ error for the best solution is approximately $1.59 \times 10^{-2}$:
