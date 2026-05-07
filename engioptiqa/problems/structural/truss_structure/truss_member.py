@@ -21,16 +21,17 @@ class TrussMember:
         return ((x1 - x0)**2 + (y1 - y0)**2)**0.5
 
     def compute_direction_cosines(self, local_node_id):
-        if local_node_id not in [0, 1]:
+        if local_node_id not in (0, 1):
             raise ValueError("local_node_id must be either 0 or 1")
-        if local_node_id == 0:
-            x0, y0 = self.get_coords(0)
-            x1, y1 = self.get_coords(1)
-        else:
-            x0, y0 = self.get_coords(1)
-            x1, y1 = self.get_coords(0)
+
+        x0, y0 = self.get_coords(0)
+        x1, y1 = self.get_coords(1)
+
+        sign = 1 if local_node_id == 0 else -1
         L = self.length
-        l = (x1 - x0) / L
-        m = (y1 - y0) / L
+
+        l = sign * (x1 - x0) / L
+        m = sign * (y1 - y0) / L
+
         return (l, m)
 
