@@ -17,13 +17,13 @@ class QAOASolverPennylane(QAOASolver):
     def __init__(self, token_file=None, proxy=None, *args, **kwargs):
         super().__init__(token_file=token_file, proxy=proxy, *args, **kwargs)
 
-    def setup_device(self, device, shots=None):
+    def setup_device(self, device):
         wires = range(self.n_qubits)
 
         if device == 'MQSSPennylaneDevice':
             self.dev = MQSSPennylaneDevice(wires=wires, token=self.token, backends='EQE1')
         else:
-            self.dev = qml.device(device, wires=wires, shots=shots)
+            self.dev = qml.device(device, wires=wires)
 
 
     def convert_binary_to_ising(self, binary_poly_dict):
@@ -107,6 +107,15 @@ class QAOASolverPennylane(QAOASolver):
 
         return expectation_circuit
 
+    def qaoa_sample_circuit(self):
+
+        @qml.qnode(self.dev)
+        def sample_circuit(betas, gammas):
+            self.ansatz(betas, gammas)
+            return qml.sample(wires=range(self.n_qubits))
+
+        return sample_circuit
+
     def objective_function(self, betas, gammas):
         expectation_circuit = self.qaoa_expectation_circuit()
         return expectation_circuit(betas, gammas)
@@ -156,8 +165,11 @@ class QAOASolverPennylane(QAOASolver):
 
         return pairs
 
-    def solve_problem(self, problem, num_layers=1, mode='fixed', device='lightning.qubit', shots=None):
+    def solve_problem(self, problem, num_layers=1, mode='fixed', device='lightning.qubit', circuit='sample', shots=None):
         print("Solving problem with Pennylane QAOA solver")
+
+        if circuit == 'sample' and shots is None:
+            raise ValueError("Number of shots must be specified for sampling mode.")
 
         # Convert the binary polynomial to an Ising polynomial
         binary_poly_dict = problem.binary_model.objective.asdict()
@@ -171,7 +183,7 @@ class QAOASolverPennylane(QAOASolver):
         self.construct_mixer_hamiltonian(scaling=True)
 
         # Set up the device
-        self.setup_device(device=device, shots=shots)
+        self.setup_device(device=device)
 
         # Prepare the QAOA ansatz
         self.num_layers = num_layers
@@ -194,24 +206,53 @@ class QAOASolverPennylane(QAOASolver):
                 gammas_initial = np.random.uniform(0, 1, self.num_layers)
                 betas, gammas = self.optimize_parameters(betas_initial, gammas_initial)
 
-        # For the final circuit, compute probabilities of all bitstrings
-        probability_circuit = self.qaoa_probability_circuit()
-        probs = probability_circuit(betas, gammas)
-        if probs.ndim == 2 and probs.shape[0] == 1:
-            probs = probs[0]
-        probs = probs.reshape(-1)
+        if circuit == 'sample':
+            sample_circuit = qml.set_shots(shots)(self.qaoa_sample_circuit())
+            samples = sample_circuit(betas, gammas)
 
-        # Sort bitstrings by probability and store results in the problem
-        bitdict_prob_pairs = self.sort_bitstrings_by_probs(probs)
+            counts = defaultdict(int)
+            for row in samples:
+                bit_tuple = tuple(int(b) for b in row)
+                counts[bit_tuple] += 1
 
-        # top_pairs = bitdict_prob_pairs[:50]  # Store top 50 solutions
-        # problem.results = [
-        #     SimpleNamespace(values=bit_dict, energy=0, frequency=1)
-        #     for bit_dict, _ in top_pairs
-        # ]
+            bitdict_prob_count_triple = []
+            for bit_tuple, count in counts.items():
+                bit_dict = {i: int(b) for i, b in enumerate(bit_tuple)}
+                prob = count / shots
+                bitdict_prob_count_triple.append((bit_dict, prob, count))
 
-        problem.results = [SimpleNamespace(values=bit_dict, energy=0, frequency=1) for bit_dict, _ in bitdict_prob_pairs]
-        sorted_probabilities = [p for _, p in bitdict_prob_pairs]
+            bitdict_prob_count_triple.sort(key=lambda x: x[1], reverse=True)
+            print("Number of solutions:", len(bitdict_prob_count_triple))
+
+            problem.results = [SimpleNamespace(values=bit_dict, energy=0, frequency=cnt) for bit_dict, _, cnt in bitdict_prob_count_triple]
+            sorted_probabilities = [p for _, p, _ in bitdict_prob_count_triple]
+
+        elif circuit == 'probs':
+            # For the final circuit, compute probabilities of all bitstrings
+            probability_circuit = qml.set_shots(shots)(self.qaoa_probability_circuit())
+            probs = probability_circuit(betas, gammas)
+            if probs.ndim == 2 and probs.shape[0] == 1:
+                probs = probs[0]
+            probs = probs.reshape(-1)
+
+            # Sort bitstrings by probability and store results in the problem
+            bitdict_prob_pairs = self.sort_bitstrings_by_probs(probs)
+
+            if shots is not None:
+                top_pairs = bitdict_prob_pairs[:shots]  # Store top solutions
+                problem.results = [
+                    SimpleNamespace(values=bit_dict, energy=0, frequency=1)
+                    for bit_dict, _ in top_pairs
+                ]
+                sorted_probabilities = [p for _, p in top_pairs]
+            else:
+                problem.results = [SimpleNamespace(values=bit_dict, energy=0, frequency=1) for bit_dict, _ in bitdict_prob_pairs]
+
+                sorted_probabilities = [p for _, p in bitdict_prob_pairs]
+
+        else:
+            raise ValueError(f"Unsupported circuit type: {circuit}")
+
 
         return sorted_probabilities
 
