@@ -165,11 +165,14 @@ class QAOASolverPennylane(QAOASolver):
 
         return pairs
 
-    def solve_problem(self, problem, num_layers=1, mode='fixed', device='lightning.qubit', circuit='sample', shots=None):
+    def solve_problem(self, problem, num_layers=1, mode='fixed', device='lightning.qubit', circuit='probs', shots=None):
         print("Solving problem with Pennylane QAOA solver")
 
         if circuit == 'sample' and shots is None:
             raise ValueError("Number of shots must be specified for sampling mode.")
+
+        if shots is not None and (not isinstance(shots, int) or shots <= 0):
+            raise ValueError("Number of shots must be a positive integer.")
 
         # Convert the binary polynomial to an Ising polynomial
         binary_poly_dict = problem.binary_model.objective.asdict()
