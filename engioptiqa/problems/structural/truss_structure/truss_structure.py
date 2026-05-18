@@ -22,17 +22,20 @@ class TrussStructure(Problem):
         """
 
         super().__init__(output_path)
+        self.nsd = 2
         self.nodes = {}  # Dictionary to store nodes: {node_id: (x, y)}
         self.n_nodes = 0
         self.members = []  # List to store truss members
         self.n_members = 0
+        self.optional_members = []  # List to store optional members (if any)
+        self.n_optional_members = 0
         self.loads = {}  # Dictionary to store external forces: {node_id: (Fx, Fy)}
         self.supports = {}  # Dictionary to store support conditions: {node_id: (x_fixed, y_fixed)}
 
         self.penalty_weight = 0.0
 
     def capabilities(self):
-        return super().capabilities() | {"outeropt_penalty"}
+        return super().capabilities() | {"outeropt_penalty", "outeropt_augmented_lagrangian"}
 
     def add_node(self, node_id, coordinates):
         """
@@ -41,10 +44,12 @@ class TrussStructure(Problem):
         :param node_id: Unique identifier for the node (e.g., integer or string).
         :param coordinates: Tuple (x, y) representing the node's position.
         """
+        if len(coordinates) != self.nsd:
+            raise Exception(f"Only {self.nsd}D coordinates allowed!")
         self.nodes[node_id] = coordinates
         self.n_nodes += 1
 
-    def add_member(self, node_0_id, node_1_id, A=None, E=None, member_id=None):
+    def add_member(self, node_0_id, node_1_id, A=None, E=None, member_id=None, optional=True):
         """
         Add a truss member to the structure.
 
@@ -53,6 +58,7 @@ class TrussStructure(Problem):
         :param A: Cross-sectional area of the member (optional).
         :param E: Young's modulus of the member (optional).
         :param member_id: Unique identifier for the member (optional).
+        :param optional: Boolean indicating if the member is optional (default: True).
         """
         if node_0_id not in self.nodes or node_1_id not in self.nodes:
             raise ValueError("Both nodes must exist in the structure before adding a member.")
@@ -62,6 +68,9 @@ class TrussStructure(Problem):
         member = TrussMember(node_0_id, node_1_id, node_0, node_1, A, E, member_id)
         self.members.append(member)
         self.n_members += 1
+        if optional:
+            self.optional_members.append(member)
+            self.n_optional_members += 1
 
     def set_member_areas(self, member_areas):
         """
@@ -152,6 +161,18 @@ class TrussStructure(Problem):
         """
         return self.supports
 
+    def get_n_fixed(self):
+        n_fixed = 0
+        for i_node in range(self.n_nodes):
+            x_fixed = y_fixed = False
+            if i_node in self.supports.keys():
+                x_fixed, y_fixed = self.supports[i_node]
+            if x_fixed:
+                n_fixed += 1
+            if y_fixed:
+                n_fixed += 1
+        return n_fixed
+
     def visualize(self, subtitle=''):
         """
         Visualize the truss structure, including nodes, members, loads, and supports.
@@ -169,18 +190,27 @@ class TrussStructure(Problem):
         A_max = max([member.A for member in self.members if member.A is not None]) if any(member.A > 0. for member in self.members) else 1.0
         # print(f'Max Area: {A_max}')
 
+        x_max = max([coord[0] for coord in self.nodes.values()])
+        x_min = min([coord[0] for coord in self.nodes.values()])
+        dx = x_max - x_min
+        y_max = max([coord[1] for coord in self.nodes.values()])
+        y_min = min([coord[1] for coord in self.nodes.values()])
+        dy = y_max - y_min
         for member in self.members:
             x0, y0 = member.get_coords(local_node_id = 0)
             x1, y1 = member.get_coords(local_node_id = 1)
             lw = member.A / A_max * 5 if member.A is not None else 1.0
-            ax.plot([x0, x1], [y0, y1], color='gray',lw=lw, label="Member", zorder=1)  # Members as black lines
+            if member in self.optional_members and member.A > 0.:
+                ax.plot([x0, x1], [y0, y1], color='gray', linestyle='dashed', lw=lw, label="Member", zorder=1)
+            else:
+                ax.plot([x0, x1], [y0, y1], color='gray',lw=lw, label="Member", zorder=1)
 
         # Plot loads
         for node_id, (Fx, Fy) in self.loads.items():
             x, y = self.nodes[node_id]
             F_norm = (Fx**2 + Fy**2)**0.5
-            ax.arrow(x, y, Fx / (2*F_norm), Fy / (2*F_norm), color='red', zorder=1,
-                     head_width=0.025, length_includes_head=True)  # Loads as red arrows
+            ax.arrow(x, y, Fx / (2*F_norm) * dx, Fy / (2*F_norm) * dy, color='red', zorder=1,
+                     head_width=0.02*np.sqrt(dx**2 + dy**2), length_includes_head=True)  # Loads as red arrows
 
         # Plot supports
         for node_id, (x_fixed, y_fixed) in self.supports.items():
@@ -385,7 +415,7 @@ class TrussStructure(Problem):
             total_volume += A * L
         return total_volume
 
-    def joint_residuals_squared(self, member_stresses, member_areas):
+    def joint_residuals(self, member_stresses, member_areas):
 
         # Equilibrium (automatically fulfilled without body forces)
 
@@ -425,30 +455,71 @@ class TrussStructure(Problem):
         else:
             raise Exception('No loads specified.')
 
+        bc_cons_x = []
+        bc_cons_y = []
+
         for i_node in range(self.n_nodes):
             x_fixed = y_fixed = False
             if i_node in self.supports.keys():
                 x_fixed, y_fixed = self.supports[i_node]
             if not x_fixed:
+                bc_cons_x.append(joint_forces_x[i_node]/scale)
                 cons_bc += (joint_forces_x[i_node]/scale)**2
             if not y_fixed:
+                bc_cons_y.append(joint_forces_y[i_node]/scale)
                 cons_bc += (joint_forces_y[i_node]/scale)**2
 
-        return cons_bc
+        return bc_cons_x, bc_cons_y
+
+    def joint_residuals_squared_sum(self, member_stresses, member_areas):
+
+        bc_cons_x, bc_cons_y = self.joint_residuals(member_stresses, member_areas)
+
+        bc_cons_poly = 0.0
+        for bc_con in bc_cons_x:
+            bc_cons_poly += bc_con**2
+        for bc_con in bc_cons_y:
+            bc_cons_poly += bc_con**2
+        return bc_cons_x, bc_cons_y, bc_cons_poly
 
     def generate_joint_residuals_poly(self):
         member_stresses = self.member_stress_polys
         member_areas = self.member_area_polys
-        self.joint_residuals_poly = self.joint_residuals_squared(member_stresses, member_areas)
 
-    def generate_problem_formulation(self, penalty_weight):
+        bc_cons_x, bc_cons_y, bc_cons_sq_sum = self.joint_residuals_squared_sum(member_stresses, member_areas)
+        self.joint_residuals_squared_sum_poly = bc_cons_sq_sum
+        self.joint_residual_polys = bc_cons_x + bc_cons_y
+
+    def generate_constraint_polys(self):
+        self.generate_joint_residuals_poly()
+        self.constraint_polys = self.joint_residual_polys
+        self.constraints_sum_squared_poly = self.joint_residuals_squared_sum_poly
+
+    def get_n_constraints(self):
+        n_free = self.nsd*self.n_nodes - self.get_n_fixed()
+        return n_free
+
+    def generate_problem_formulation(self, penalty_weight=1.0, lagrange_multipliers=[], mode='penalty'):
         self.generate_complementary_energy_poly()
         self.generate_joint_residuals_poly()
-        self.penalty_weight = penalty_weight
-        self.poly = self.complementary_energy_poly + \
-            self.penalty_weight * self.joint_residuals_poly
+        self.generate_objective_poly(penalty_weight=penalty_weight, lagrange_multipliers=lagrange_multipliers, mode=mode)
         self.binary_model = Model(self.poly)
 
+    def generate_objective_poly(self,penalty_weight=1.0, lagrange_multipliers=[], mode='penalty'):
+        if mode == 'penalty' or mode == 'augmented_lagrangian':
+            self.penalty_weight = penalty_weight
+            print(f"Penalty weight: {self.penalty_weight}\n")
+            self.poly = self.complementary_energy_poly + \
+                self.penalty_weight * self.constraints_sum_squared_poly
+            if mode == 'augmented_lagrangian':
+                n_constraints = self.get_n_constraints()
+                if len(lagrange_multipliers) != (n_constraints):
+                    raise Exception('Number of Lagrange multipliers must be equal to number of constraints' \
+                                    f'({n_constraints}).')
+                for i, lagrange_multiplier in enumerate(lagrange_multipliers):
+                    self.poly -= lagrange_multiplier * self.constraint_polys[i]
+        else:
+            raise Exception(f'Unknown mode ({mode}) for problem formulation.')
     def analyze_results(self, results=None, analysis_plots=True, compute_errors=True, result_max=sys.maxsize):
 
         if results is None and not hasattr(self, 'results'):
@@ -465,11 +536,16 @@ class TrussStructure(Problem):
             member_forces_sol = [member_stresses_sol[i]*member_areas_sol[i] for i in range(len(member_stresses_sol))]
             complementary_energy_sol = self.complementary_energy(member_stresses_sol, member_areas_sol)
             volume_sol = self.total_volume(member_areas_sol)
-            joint_residuals_squared_sol = self.joint_residuals_squared(member_stresses_sol, member_areas_sol)
-            constraints_sol = joint_residuals_squared_sol
+            joint_residuals_x_sol,  joint_residuals_y_sol, joint_residuals_squared_sum_sol = self.joint_residuals_squared_sum(member_stresses_sol, member_areas_sol)
+            joint_residuals_sol = joint_residuals_x_sol + joint_residuals_y_sol
+            constraints_sol = joint_residuals_sol
+            volume_residual_sol= 0.0
             if hasattr(self, 'target_volume'):
-                constraints_sol += (volume_sol-self.target_volume)**2
-            objective_sol = complementary_energy_sol + self.penalty_weight * constraints_sol
+                volume_residual_sol = (volume_sol-self.target_volume)/self.target_volume
+                constraints_sol.extend([volume_residual_sol])
+            volume_residual_squared_sol = volume_residual_sol**2
+            constraints_squared_sum_sol = joint_residuals_squared_sum_sol + volume_residual_squared_sol
+            objective_sol = complementary_energy_sol + self.penalty_weight * (constraints_squared_sum_sol)
 
             if best_solution is None or objective_sol < best_solution['objective']:
                 best_solution = solutions[i_result]
@@ -480,8 +556,10 @@ class TrussStructure(Problem):
             solutions[i_result]['member_areas'] = member_areas_sol
             solutions[i_result]['complementary_energy'] = complementary_energy_sol
             solutions[i_result]['volume'] = volume_sol
-            solutions[i_result]['joint_residuals_squared'] = joint_residuals_squared_sol
+            solutions[i_result]['volume_residual_squared'] = volume_residual_squared_sol
+            solutions[i_result]['joint_residuals_squared_sum'] = joint_residuals_squared_sum_sol
             solutions[i_result]['constraints'] = constraints_sol
+            solutions[i_result]['constraints_squared_sum'] = constraints_squared_sum_sol
             solutions[i_result]['objective'] = objective_sol
 
             if hasattr(self, 'ts_ref'):
@@ -494,8 +572,10 @@ class TrussStructure(Problem):
         print('Best solution (minimum objective):')
         print(f"Objective: {best_solution['objective']}")
         print(f"Complementary Energy: {best_solution['complementary_energy']}")
+        print(f"Constraints (squared sum): {best_solution['constraints_squared_sum']}")
+        print(f"Joint Residuals (squared): {best_solution['joint_residuals_squared_sum']}")
         print(f"Volume: {best_solution['volume']}")
-        print(f"Joint Residuals (squared): {best_solution['joint_residuals_squared']}")
+        print(f"Volume residual (squared): {best_solution['volume_residual_squared']}")
         print(f"Member Forces: {best_solution['member_forces']}")
         print(f"Member Stresses: {best_solution['continuous_vars']}")
         print(f"Member Areas: {best_solution['member_areas']}")

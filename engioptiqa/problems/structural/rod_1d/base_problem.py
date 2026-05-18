@@ -40,7 +40,7 @@ class BaseProblemRod1D(Problem):
             ['Cross Sections', 'Complementary Energy', 'Compliance']
 
     def capabilities(self):
-        return super().capabilities() | {"outeropt_penalty"}
+        return super().capabilities() | {"outeropt_penalty", "outeropt_augmented_lagrangian"}
 
     def analytical_complementary_energy_and_compliance(self, A_combi):
 
@@ -219,10 +219,9 @@ class BaseProblemRod1D(Problem):
 
         self.complementary_energy_poly = PI_poly
 
-    def constraints(self, nf, cs_inv):
+    def equilibrium_constraints(self, nf, cs_inv):
 
-        # Equilibrium.
-        cons_eq = []
+        eq_res = []
         for i_comp in range(self.rod.n_comp):
             a1 = nf[i_comp]
             a2 = nf[i_comp+1]
@@ -230,37 +229,58 @@ class BaseProblemRod1D(Problem):
             div = (a2-a1)*cs_inv[i_comp]
             vol_force = (self.rod.x[i_comp+1]-self.rod.x[i_comp])*self.rod.rho[i_comp]*self.g
             eq = div + vol_force
+            # eq_res.append(eq/self.rod.n_comp)
+            eq_res.append(eq)
+        return eq_res
 
-            # Penalty term.
-            # Manually.
-            con_comp = eq**2
-            cons_eq.append(con_comp)
+    def traction_bc_constraints(self, nf):
+        traction_bc = 0.0
+        bc_res = nf[-1]-traction_bc
+        return bc_res
 
-        cons_eq = sum(cons_eq)/self.rod.n_comp
+    def constraints(self, nf, cs_inv):
+
+        # Equilibrium.
+        eq_cons = self.equilibrium_constraints(nf, cs_inv)
+        eq_cons_squared = []
+        for i_comp in range(self.rod.n_comp):
+            eq_cons_squared.append(eq_cons[i_comp]**2)
+
+        eq_cons_sq_sum = sum(eq_cons_squared)
 
         # Traction Boundary Condition.
-        traction_bc = 0.0
-        cons_bc=(nf[-1]-traction_bc)**2
+        traction_bc_con = self.traction_bc_constraints(nf)
+        traction_bc_con_sq =traction_bc_con**2
 
-        return cons_eq, cons_bc
+        return eq_cons, eq_cons_sq_sum, traction_bc_con_sq
 
     def generate_constraint_polys(self):
 
         nf = self.nf_polys
         cs_inv = self.cs_inv_polys
-        con_eq, con_bc = self.constraints(nf, cs_inv)
+        eq_cons, eq_cons_sq_sum, traction_bc_con_sq = self.constraints(nf, cs_inv)
 
         # Only consider equilibrium constraint, since traction BC is built into ansatz.
-        self.equilibrium_constraint_poly =  con_eq
+        self.equilibrium_constraint_polys = eq_cons
+        self.equilibrium_constraints_squared_sum_poly =  eq_cons_sq_sum
 
-    def generate_problem_formulation(self, penalty_weight = 1.0):
+    def generate_problem_formulation(self, penalty_weight = 1.0, lagrange_multipliers = [], mode = 'penalty'):
         self.generate_complementary_energy_poly()
         self.generate_constraint_polys()
 
-        self.penalty_weight_equilibrium = penalty_weight
-        print(f"Penalty weight (equilibrium): {self.penalty_weight_equilibrium}\n")
-        self.poly = self.complementary_energy_poly + \
-            self.penalty_weight_equilibrium * self.equilibrium_constraint_poly
+        if mode == 'penalty' or mode == 'augmented_lagrangian':
+            self.penalty_weight = penalty_weight
+            print(f"Penalty weight: {self.penalty_weight}\n")
+            self.poly = self.complementary_energy_poly + \
+                self.penalty_weight * self.equilibrium_constraints_squared_sum_poly
+            if mode == 'augmented_lagrangian':
+                if len(lagrange_multipliers) != self.rod.n_comp:
+                    raise Exception('Number of Lagrange multipliers must be equal to number of components' \
+                                    f'({self.rod.n_comp}).')
+                for i, lagrange_multiplier in enumerate(lagrange_multipliers):
+                    self.poly -= lagrange_multiplier * self.equilibrium_constraint_polys[i]
+        else:
+            raise Exception(f'Unknown mode ({mode}) for problem formulation.')
 
         self.binary_model = Model(self.poly)
 
@@ -268,10 +288,10 @@ class BaseProblemRod1D(Problem):
         self.print_and_log(output)
 
     def update_penalty_weight_in_problem_formulation(self, penalty_weight = 1.0):
-        self.penalty_weight_equilibrium = penalty_weight
-        print(f"Penalty weight (equilibrium): {self.penalty_weight_equilibrium}\n")
+        self.penalty_weight = penalty_weight
+        print(f"Penalty weight (equilibrium): {self.penalty_weight}\n")
         self.poly = self.complementary_energy_poly + \
-            self.penalty_weight_equilibrium * self.equilibrium_constraint_poly
+            self.penalty_weight * self.equilibrium_constraints_squared_sum_poly
 
         self.binary_model = Model(self.poly)
 
@@ -356,13 +376,14 @@ class BaseProblemRod1D(Problem):
             # Compute complementary energy.
             PI_sol =  self.complementary_energy(nf_sol, cs_inv_sol)
             # Evaluate constraints.
-            con_eq_sol, con_bc_sol = self.constraints(nf_sol, cs_inv_sol)
+            eq_cons, eq_cons_sq_sum, traction_bc_con_sq = self.constraints(nf_sol, cs_inv_sol)
             # Compute objective function.
-            obj_sol = PI_sol + self.penalty_weight_equilibrium*con_eq_sol + 0.0*con_bc_sol
+            obj_sol = PI_sol + self.penalty_weight*eq_cons_sq_sum
 
             solutions[i_result]['bit_array'] = bit_array
             solutions[i_result]['complementary_energy'] = PI_sol
-            solutions[i_result]['constraints'] = con_eq_sol
+            solutions[i_result]['constraints'] = eq_cons
+            solutions[i_result]['constraints_squared_sum'] = eq_cons_sq_sum
             solutions[i_result]['objective'] = obj_sol
             solutions[i_result]['energy'] = self.get_energy(i_result)
             solutions[i_result]['frequency'] = self.get_frequency(i_result)
@@ -400,7 +421,7 @@ class BaseProblemRod1D(Problem):
                 self.print_and_log(output)
                 self.print_nodal_force_and_cross_section_inverse(nf_sol, cs_inv_sol)
                 if compute_errors:
-                    self.print_solution_quantities(PI_sol, con_eq_sol, con_bc_sol, obj_sol, error_l2_force_abs, error_l2_force_rel)
+                    self.print_solution_quantities(PI_sol, eq_cons, eq_cons_sq_sum, traction_bc_con_sq, obj_sol, error_l2_force_abs, error_l2_force_rel)
                 # Plot Solution
                 if analysis_plots:
                     if self.output_path is not None:
@@ -428,11 +449,11 @@ class BaseProblemRod1D(Problem):
 
         return solutions
 
-    def print_solution_quantities(self, PI_sol, con_eq_sol, con_bc_sol, obj_sol, error_force_abs, error_force_rel):
+    def print_solution_quantities(self, PI_sol, eq_cons, eq_cons_sq_sum, traction_bc_con_sq, obj_sol, error_force_abs, error_force_rel):
             output = f'\tComplementary Energy = {PI_sol:.15g} ({self.PI_analytic:.15g})\n'
-            output+= f'\tConstraints = {con_eq_sol:.15g} {con_bc_sol:.15g}\n'
-            con_eq_w_sol = self.penalty_weight_equilibrium*con_eq_sol
-            output+= f'\tWeighted Constraints = {con_eq_w_sol:.15g} 0.0\n'
+            output+= f'\tConstraints Squared Sum = {eq_cons_sq_sum:.15g}\n'
+            quadratic_penalty_term_sol = self.penalty_weight*eq_cons_sq_sum
+            output+= f'\tQuadratic Penalty Term = {quadratic_penalty_term_sol:.15g}\n'
             output+= f'\tObjective = {obj_sol:.15g}\n'
             output+= f'\tAbsolute Error = {error_force_abs:.15g}\n'
             output+= f'\tRelative Error = {error_force_rel:.15g}\n'
