@@ -501,7 +501,7 @@ class TrussStructure(Problem):
 
     def generate_problem_formulation(self, penalty_weight=1.0, lagrange_multipliers=[], mode='penalty'):
         self.generate_complementary_energy_poly()
-        self.generate_joint_residuals_poly()
+        self.generate_constraint_polys()
         self.generate_objective_poly(penalty_weight=penalty_weight, lagrange_multipliers=lagrange_multipliers, mode=mode)
         self.binary_model = Model(self.poly)
 
