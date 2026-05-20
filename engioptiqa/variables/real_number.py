@@ -180,8 +180,8 @@ class Range(RealNumber):
                 print("  Raising lower bound.")
             actions.append("min ▲")
         elif a == a_prev:
-            a_min = a - delta * c/4
-            a_max = a + delta * c/4
+            a_min = a - delta * (1 + (1 - c)) / 4
+            a_max = a + delta * (1 + (1 - c)) / 4
             if verbose:
                 print("  Shrinking range.")
             actions.append("shrink ▶◀")
