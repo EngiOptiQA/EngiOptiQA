@@ -242,14 +242,19 @@ class QAOASolverPennylane(QAOASolver):
             bitdict_prob_pairs = self.sort_bitstrings_by_probs(probs)
 
             if shots is not None:
-                top_pairs = bitdict_prob_pairs[:shots]  # Store top solutions
+                # Empirical probabilities (estimated from sampled measurements)
+                n_non_zero_probs = np.count_nonzero(probs)
+                print("Number of solutions with non-zero probability:", n_non_zero_probs)
+                non_zero_prob_pairs = bitdict_prob_pairs[:n_non_zero_probs]  # Store solutions with non-zero probability
                 problem.results = [
                     SimpleNamespace(values=bit_dict, energy=0, frequency=1)
-                    for bit_dict, _ in top_pairs
+                    for bit_dict, _ in non_zero_prob_pairs
                 ]
-                sorted_probabilities = [p for _, p in top_pairs]
+                sorted_probabilities = [p for _, p in non_zero_prob_pairs]
             else:
+                # Analytical probabilities
                 problem.results = [SimpleNamespace(values=bit_dict, energy=0, frequency=1) for bit_dict, _ in bitdict_prob_pairs]
+                sorted_probabilities = [p for _, p in bitdict_prob_pairs]
 
                 sorted_probabilities = [p for _, p in bitdict_prob_pairs]
 
