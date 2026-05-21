@@ -747,7 +747,6 @@ class TrussStructure(Problem):
             elif type(result) is SimpleNamespace:
                 member_stress_sol.append(self.decode_amplify_poly_with_bitstring(member_stress_poly,result.values))
             else:
-                print(type(result))
                 member_stress_sol.append(member_stress_poly.decode(result.values))
         return member_stress_sol
 
