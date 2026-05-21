@@ -173,6 +173,41 @@ class TrussStructure(Problem):
                 n_fixed += 1
         return n_fixed
 
+    def check_statically_determinate(self):
+        """
+        Check if the truss is statically determinate.
+
+        :return: Dictionary with information about the truss's determinacy.
+        """
+
+        m = self.n_members # Number of members
+        j = len(self.nodes) # Number of joints (nodes)
+        # Reaction count: sum of fixed directions over supports
+        r = 0
+        for _, (xf, yf) in self.supports.items():
+            if xf:
+                r += 1
+            if yf:
+                r += 1
+
+        # Determinacy condition for truss: m + r = nsd*j
+        degree = (m + r) - self.nsd * j
+        if degree == 0:
+            condition = 'determinate'
+        elif degree > 0:
+            condition = 'indeterminate'
+        else:  # degree < 0
+            condition = 'unstable'
+
+        return {
+            'm': m,
+            'j': j,
+            'r': r,
+            'condition': condition,
+            'degree': degree,
+        }
+
+
     def visualize(self, subtitle=''):
         """
         Visualize the truss structure, including nodes, members, loads, and supports.
@@ -445,7 +480,6 @@ class TrussStructure(Problem):
             joint_forces_y[node_id_1] += F * m
 
         # Sum the squared residual forces over all joints (ignore supports)
-        cons_bc = 0.0
         n_loads = len(self.loads)
         if n_loads > 0:
             total_mag = 0.0
@@ -464,10 +498,8 @@ class TrussStructure(Problem):
                 x_fixed, y_fixed = self.supports[i_node]
             if not x_fixed:
                 bc_cons_x.append(joint_forces_x[i_node]/scale)
-                cons_bc += (joint_forces_x[i_node]/scale)**2
             if not y_fixed:
                 bc_cons_y.append(joint_forces_y[i_node]/scale)
-                cons_bc += (joint_forces_y[i_node]/scale)**2
 
         return bc_cons_x, bc_cons_y
 
@@ -609,6 +641,26 @@ class TrussStructure(Problem):
 
     def set_reference_solution(self, ts_ref):
         self.ts_ref = ts_ref
+        # Check if reference truss structures is matching (i.e., subset of nodes and supports, same loads)
+        ref_nodes_form_subset = (ts_ref.nodes.items() <= self.nodes.items())
+        if not ref_nodes_form_subset:
+            raise Exception('Nodes in the reference solution do not form a subset of the truss structure nodes.')
+        # Compare supports
+        ref_supports_form_subset = (ts_ref.supports.items() <= self.supports.items())
+        if not ref_supports_form_subset:
+            raise Exception('Supports in the reference solution do not form a subset of the truss structure supports.')
+        # Compare loads
+        loads_equal = (self.loads == ts_ref.loads)
+        if not loads_equal:
+            raise Exception('Loads are not matching.')
+
+        # Check if reference solution is statically determinate (required for unique solution and valid comparison)
+        statically_determinate_info = self.ts_ref.check_statically_determinate()
+        if statically_determinate_info['condition'] != 'determinate':
+            message = f"Reference solution must be statically determinate but is " \
+                       f"{statically_determinate_info['condition']} " \
+                       f"with degree {statically_determinate_info['degree']}."
+            raise Exception(message)
 
     def compare_with_reference_solution(self, solution):
         if not hasattr(self, 'ts_ref'):
