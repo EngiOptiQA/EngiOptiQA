@@ -246,15 +246,15 @@ class QAOASolverPennylane(QAOASolver):
                 n_non_zero_probs = np.count_nonzero(probs)
                 print("Number of solutions with non-zero probability:", n_non_zero_probs)
                 non_zero_prob_pairs = bitdict_prob_pairs[:n_non_zero_probs]  # Store solutions with non-zero probability
+
                 problem.results = [
-                    SimpleNamespace(values=bit_dict, energy=0, frequency=1)
-                    for bit_dict, _ in non_zero_prob_pairs
+                    SimpleNamespace(values=bit_dict, energy=0, frequency=int(round(p * shots)))
+                    for bit_dict, p in non_zero_prob_pairs
                 ]
                 sorted_probabilities = [p for _, p in non_zero_prob_pairs]
             else:
                 # Analytical probabilities
                 problem.results = [SimpleNamespace(values=bit_dict, energy=0, frequency=1) for bit_dict, _ in bitdict_prob_pairs]
-                sorted_probabilities = [p for _, p in bitdict_prob_pairs]
 
                 sorted_probabilities = [p for _, p in bitdict_prob_pairs]
 
