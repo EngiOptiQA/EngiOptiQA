@@ -367,8 +367,8 @@ class TrussStructure(Problem):
         self.real_number = RealNumber(self.n_qubits_per_var, self.binary_representation, lower_lim, upper_lim)
 
         member_stress_polys = []
-        for _ in self.members:
-            q = self.variable_generator.array("Binary", self.n_qubits_per_var)
+        for i_member, _ in enumerate(self.members):
+            q = self.variable_generator.array("Binary", self.n_qubits_per_var, name=f"q_S_{i_member}")
             member_stress_polys.append(self.real_number.evaluate(q))
         self.member_stress_polys = member_stress_polys
 
@@ -376,7 +376,7 @@ class TrussStructure(Problem):
         self.initialize_discretization()
         member_stress_polys = []
         for i_member, _ in enumerate(self.members):
-            q = self.variable_generator.array("Binary", self.n_qubits_per_var)
+            q = self.variable_generator.array("Binary", self.n_qubits_per_var, name=f"q_S_{i_member}")
             if self.binary_representation == 'range':
                 self.real_number.set_range(self.a_min[i_member], self.a_max[i_member])
             member_stress_polys.append(self.real_number.evaluate(q))

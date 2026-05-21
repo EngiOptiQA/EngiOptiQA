@@ -13,11 +13,13 @@ class TrussStructureOptimization(TrussStructure):
         member_area_polys = []
         member_areas = self.get_member_areas()
 
+        q = self.variable_generator.array("Binary", self.n_optional_members , name=f"q_A")
+        i_optional_member = 0
         for i_member in range(self.n_members):
             if self.members[i_member] in self.optional_members:
-                q = self.variable_generator.array("Binary", 1)
                 A = member_areas[i_member]
-                member_area_polys.append(A*q[0])
+                member_area_polys.append(A*q[i_optional_member])
+                i_optional_member += 1
             else:
                 A = member_areas[i_member]
                 member_area_polys.append(A)
