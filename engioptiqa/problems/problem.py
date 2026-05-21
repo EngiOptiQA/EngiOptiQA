@@ -6,6 +6,7 @@ from dimod.sampleset import SampleSet
 import matplot2tikz
 from matplotlib import pyplot as plt
 import numpy as np
+from openjij import Response
 import os
 import sys
 
@@ -204,7 +205,7 @@ class Problem(ABC):
         return bit_array
 
     def get_energy(self, index):
-        if type(self.results) is SampleSet:
+        if type(self.results) is SampleSet or type(self.results) is Response:
             return self.results.record[index]['energy']
         else:
             if hasattr(self.results[index], 'energy'):
@@ -213,7 +214,7 @@ class Problem(ABC):
                 return np.nan
 
     def get_frequency(self, index):
-        if type(self.results) is SampleSet:
+        if type(self.results) is SampleSet or type(self.results) is Response:
             return self.results.record[index]['num_occurrences']
         else:
             if hasattr(self.results[index], 'frequency'):

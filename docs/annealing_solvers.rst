@@ -58,3 +58,21 @@ Annealing Solvers DWave Class
 
 .. .. autosummary::
 ..    :toctree: generated/
+
+Annealing Solvers OpenJij
+=========================
+
+.. automodule::  engioptiqa.annealing_solvers.annealing_solver_openjij
+
+Annealing Solvers OpenJij Class
+-------------------------------
+
+.. currentmodule:: engioptiqa.annealing_solvers.annealing_solver_openjij
+
+.. autoclass:: AnnealingSolverOpenJij
+
+.. Annealing Solvers OpenJij Methods
+.. ---------------------------------
+
+.. .. autosummary::
+..    :toctree: generated/

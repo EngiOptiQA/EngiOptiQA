@@ -23,7 +23,7 @@ Annealing Solvers Module
 ========================
 
 This module contains solvers for *Polynomial Unconstrained Binary Optimization (PUBO)* problems.
-There are two alternative implementations based on the `Fixstars Amplify SDK <https://amplify.fixstars.com/en/sdk>`_ or the `D-Wave Ocean SDK <https://www.dwavesys.com/solutions-and-products/ocean/>`_, respectively.
+There are different implementations based on the `Fixstars Amplify SDK <https://amplify.fixstars.com/en/sdk>`_, the `D-Wave Ocean SDK <https://www.dwavesys.com/solutions-and-products/ocean/>`_, or `OpenJij <https://www.openjij.org>`_.
 Please note that the D‑Wave implementation requires transforming the problem into a *Quadratic Unconstrained Binary Optimization (QUBO)* formulation before solving.
 
 .. toctree::
