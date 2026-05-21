@@ -68,8 +68,6 @@ class QAOASolverPennylane(QAOASolver):
             coeffs_norm = (coeffs / coeff_abs_max).tolist()
             self.H_cost = qml.Hamiltonian(coeffs_norm, self.H_cost.ops)
 
-        # print("Cost Hamiltonian:", self.H_cost)
-
     def construct_mixer_hamiltonian(self, scaling=True):
 
         scale_factor = 1.0
@@ -77,8 +75,6 @@ class QAOASolverPennylane(QAOASolver):
             mean_coeff_abs = np.mean(np.abs(self.H_cost.coeffs))
             scale_factor = mean_coeff_abs if mean_coeff_abs != 0 else 1.0
         self.H_mixer = qml.Hamiltonian([scale_factor]*self.n_qubits, [qml.PauliX(i) for i in range(self.n_qubits)])
-
-        # print("Mixer Hamiltonian:", self.H_mixer)
 
     def qaoa_layer(self, beta, gamma):
         qaoa.cost_layer(gamma, self.H_cost)
