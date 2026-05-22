@@ -17,6 +17,7 @@ class RealNumber:
                 'real_positive': RealPositive,
                 'normalized': Normalized,
                 'range': Range,
+                'adaptive_range': AdaptiveRange
             }
             subcls = registry.get(binary_representation)
             if subcls is None:
@@ -150,6 +151,13 @@ class Range(RealNumber):
         F = 2 ** np.arange(self.n_qubits, dtype=float)
         scale = (self.a_max - self.a_min) / (2**self.n_qubits - 1)
         return self.a_min + scale * sum(F[l] * q[l] for l in range(self.n_qubits))
+
+class AdaptiveRange(Range):
+    """
+    Adaptive range representation of a real number in the adaptive range [a_min, a_max].
+    """
+    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None):
+        super().__init__(n_qubits, binary_representation, a_min, a_max)
 
     def set_range(self, a_min, a_max):
         if a_max <= a_min:

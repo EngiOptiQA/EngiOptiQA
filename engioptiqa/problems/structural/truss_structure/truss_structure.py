@@ -384,7 +384,10 @@ class TrussStructure(Problem):
         self.generate_member_area_polys()
 
     def get_number_of_continuous_vars(self):
-        return self.n_members
+        if self.binary_representation == 'adaptive_range':
+            return self.n_members
+        else:
+            return 0
 
     def update_formulation(self):
         self.update_member_stress_polys()
@@ -392,7 +395,7 @@ class TrussStructure(Problem):
 
     def generate_member_stress_polys(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
         assert(self.variable_generator is not None)
-        if binary_representation == 'range':
+        if binary_representation in ['range', 'adaptive_range']:
             assert(lower_lim is not None and upper_lim is not None), \
                 "Lower and upper limits must be provided for range representation."
             self.a_min = np.ones(len(self.members))*lower_lim
@@ -412,7 +415,7 @@ class TrussStructure(Problem):
         member_stress_polys = []
         for i_member, _ in enumerate(self.members):
             q = self.variable_generator.array("Binary", self.n_qubits_per_var, name=f"q_S_{i_member}")
-            if self.binary_representation == 'range':
+            if self.binary_representation == 'adaptive_range':
                 self.real_number.set_range(self.a_min[i_member], self.a_max[i_member])
             member_stress_polys.append(self.real_number.evaluate(q))
         self.member_stress_polys = member_stress_polys

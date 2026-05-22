@@ -153,7 +153,7 @@ class BaseProblemRod1D(Problem):
 
     def generate_nodal_force_polys(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
         assert(self.variable_generator is not None)
-        if binary_representation == 'range':
+        if binary_representation in ['range', 'adaptive_range']:
             assert(lower_lim is not None and upper_lim is not None), \
                 "Lower and upper limits must be provided for range representation."
             self.a_min = np.ones(self.rod.n_comp)*lower_lim
@@ -175,7 +175,7 @@ class BaseProblemRod1D(Problem):
         nf_polys = []
         for i_comp in range(self.rod.n_comp):
             q = self.variable_generator.array("Binary", self.n_qubits_per_var)
-            if self.binary_representation == 'range':
+            if self.binary_representation == 'adaptive_range':
                 self.real_number.set_range(self.a_min[i_comp], self.a_max[i_comp])
             nf_polys.append(self.real_number.evaluate(q))
             if i_comp == self.rod.n_comp-1:
