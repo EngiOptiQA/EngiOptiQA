@@ -5,6 +5,7 @@ from .vqa_solvers import *
 __all__ = [
     "AnnealingSolverAmplify",
     "AnnealingSolverDWave",
+    "AnnealingSolverOpenJij",
     "BruteForceSolver",
     "QAOASolverPennylane",
 ]
