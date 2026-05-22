@@ -72,6 +72,11 @@ class Problem(ABC):
     def get_number_of_adaptive_vars(self):
         return 0
 
+    def get_position_in_bit_array(self, i_var):
+        start = i_var * self.n_qubits_per_var
+        end = (i_var + 1) * self.n_qubits_per_var
+        return start, end
+
     def update_ranges(self, sol_bit_array, sol, sol_prev, relaxation_factor, verbose=False):
 
         n_vars = self.get_number_of_adaptive_vars()
@@ -84,9 +89,9 @@ class Problem(ABC):
         sol_encoded_new = [[] for _ in range(n_vars)]
         for i_var in range(n_vars):
 
-            # Extract bit array for current node
-            start = i_var * self.n_qubits_per_var
-            end = (i_var + 1) * self.n_qubits_per_var
+            # Extract bit array for current variable
+            start, end = self.get_position_in_bit_array(i_var)
+
             sol_encoded[i_var] = sol_bit_array[start:end]
 
             sol_decoded[i_var] = self.real_number.decode_bits_to_real(

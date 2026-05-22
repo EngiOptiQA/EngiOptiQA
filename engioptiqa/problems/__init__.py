@@ -10,4 +10,5 @@ __all__ = [
     "TrussMember",
     "TrussStructure",
     "TrussStructureOptimization",
+    "TrussStructureOptimizationContinuous",
 ]
