@@ -69,12 +69,12 @@ class Problem(ABC):
 
     # Support for adaptive encoding of continuous variables
     # -----------------------------------------------------
-    def get_number_of_continuous_vars(self):
+    def get_number_of_adaptive_vars(self):
         return 0
 
     def update_ranges(self, sol_bit_array, sol, sol_prev, relaxation_factor, verbose=False):
 
-        n_vars = self.get_number_of_continuous_vars()
+        n_vars = self.get_number_of_adaptive_vars()
         if n_vars == 0:
             raise Exception('Attempt to update ranges, but number of continuous variables is zero.')
         actions = ['' for _ in range(n_vars)]
@@ -107,7 +107,7 @@ class Problem(ABC):
         return actions, sol_decoded, sol_decoded_new, sol_encoded, sol_encoded_new
 
     def update_solution(self, sol_bit_array, sol_encoded):
-        n_vars = self.get_number_of_continuous_vars()
+        n_vars = self.get_number_of_adaptive_vars()
         for i_var in range(n_vars):
             start = i_var * self.n_qubits_per_var
             end = (i_var + 1) * self.n_qubits_per_var

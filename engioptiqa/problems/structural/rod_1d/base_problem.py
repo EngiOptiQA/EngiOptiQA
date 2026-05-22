@@ -144,8 +144,11 @@ class BaseProblemRod1D(Problem):
         phi2 = (x_sym-xi)/(xj-xi)
         return phi1, phi2
 
-    def get_number_of_continuous_vars(self):
-        return self.rod.n_comp
+    def get_number_of_adaptive_vars(self):
+        if self.binary_representation == 'adaptive_range':
+            return self.rod.n_comp
+        else:
+            return 0
 
     def update_formulation(self):
         self.update_nodal_force_polys()

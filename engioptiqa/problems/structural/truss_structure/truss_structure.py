@@ -383,11 +383,14 @@ class TrussStructure(Problem):
         self.generate_member_stress_polys(n_qubits_per_var, binary_representation, lower_lim, upper_lim)
         self.generate_member_area_polys()
 
-    def get_number_of_continuous_vars(self):
+    def get_number_of_adaptive_vars(self):
         if self.binary_representation == 'adaptive_range':
             return self.n_members
         else:
             return 0
+
+    def get_adaptive_vars(self, member_stresses_sol, member_areas_sol):
+        return member_stresses_sol
 
     def update_formulation(self):
         self.update_member_stress_polys()
@@ -587,8 +590,9 @@ class TrussStructure(Problem):
 
             solutions[i_result]['bit_array'] = bit_array
             solutions[i_result]['member_forces'] = member_forces_sol
-            solutions[i_result]['continuous_vars'] = member_stresses_sol
+            solutions[i_result]['member_stresses'] = member_stresses_sol
             solutions[i_result]['member_areas'] = member_areas_sol
+            solutions[i_result]['continuous_vars'] = self.get_adaptive_vars(member_stresses_sol, member_areas_sol)
             solutions[i_result]['complementary_energy'] = complementary_energy_sol
             solutions[i_result]['volume'] = volume_sol
             solutions[i_result]['volume_residual_squared'] = volume_residual_squared_sol
