@@ -137,6 +137,9 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
     def has_adaptive_variables(self):
         return (self.binary_representation == 'adaptive_range') or (self.binary_representation_area == 'adaptive_range')
 
+    def has_adaptive_variables(self):
+        return (self.binary_representation == 'adaptive_range') or (self.binary_representation_area == 'adaptive_range')
+
     def get_number_of_adaptive_vars(self):
         if self.binary_representation == 'adaptive_range':
             if self.binary_representation_area == 'adaptive_range':
