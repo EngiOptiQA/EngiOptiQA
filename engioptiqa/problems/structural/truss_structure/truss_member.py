@@ -4,11 +4,13 @@ class TrussMember:
         self.node_id_1 = node_id_1
         self.coords = [coords_0, coords_1]
         self.A = A
+        self.A_initial = A
         self.E = E
         self.member_id = member_id
         self.length = self.compute_length()
         self.direction_cosines_0 = self.compute_direction_cosines(0)
         self.direction_cosines_1 = self.compute_direction_cosines(1)
+        self.exists = True
 
     def get_coords(self, local_node_id):
         if local_node_id not in [0, 1]:

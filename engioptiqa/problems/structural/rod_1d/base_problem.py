@@ -144,13 +144,30 @@ class BaseProblemRod1D(Problem):
         phi2 = (x_sym-xi)/(xj-xi)
         return phi1, phi2
 
+    def get_real_number_object(self, i_group):
+        assert(i_group == 0)
+        return self.real_number
+
+    def has_adaptive_variables(self):
+        return self.binary_representation == 'adaptive_range'
+
     def get_number_of_adaptive_vars(self):
         if self.binary_representation == 'adaptive_range':
-            return self.rod.n_comp
+            return np.array([self.rod.n_comp])
         else:
-            return 0
+            return np.array([0])
 
-    def update_formulation(self):
+    def get_adaptive_vars(self, nf_sol):
+        if self.binary_representation == 'adaptive_range':
+            return [nf_sol]
+        else:
+            return None
+
+    def get_range_limits(self, i_group):
+        assert(i_group == 0)
+        return self.a_min, self.a_max
+
+    def update_formulation(self, best_solution):
         self.update_nodal_force_polys()
         self.generate_cross_section_inverse_polys()
 
@@ -390,8 +407,10 @@ class BaseProblemRod1D(Problem):
             solutions[i_result]['objective'] = obj_sol
             solutions[i_result]['energy'] = self.get_energy(i_result)
             solutions[i_result]['frequency'] = self.get_frequency(i_result)
-            solutions[i_result]['continuous_vars'] = nf_sol
+            solutions[i_result]['nf'] = nf_sol
             solutions[i_result]['cs_inv'] = cs_inv_sol
+            solutions[i_result]['adaptive_vars'] = self.get_adaptive_vars(nf_sol)
+
 
             self.objectives.append(obj_sol)
             self.comp_energies.append(PI_sol)

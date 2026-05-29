@@ -207,8 +207,14 @@ class TrussStructure(Problem):
             'degree': degree,
         }
 
+    def get_number_of_existent_members(self):
+        n_existent_members = 0
+        for member in self.members:
+            if member.exists:
+                n_existent_members += 1
+        return n_existent_members
 
-    def visualize(self, subtitle=''):
+    def visualize(self, subtitle='', interactive=False):
         """
         Visualize the truss structure, including nodes, members, loads, and supports.
 
@@ -216,29 +222,33 @@ class TrussStructure(Problem):
         """
         fig, ax = plt.subplots(figsize=(8, 6))
 
-        # Plot nodes
-        for node_id, (x, y) in self.nodes.items():
-            ax.plot(x, y, 'o', color='green', zorder=2)  # Nodes as black circles
-            ax.text(x - 0.075, y - 0.075, f"{node_id}", fontsize=12, zorder=3)
-
-        # Plot members
-        A_max = max([member.A for member in self.members if member.A is not None]) if any(member.A > 0. for member in self.members) else 1.0
-        # print(f'Max Area: {A_max}')
-
         x_max = max([coord[0] for coord in self.nodes.values()])
         x_min = min([coord[0] for coord in self.nodes.values()])
         dx = x_max - x_min
         y_max = max([coord[1] for coord in self.nodes.values()])
         y_min = min([coord[1] for coord in self.nodes.values()])
         dy = y_max - y_min
-        for member in self.members:
-            x0, y0 = member.get_coords(local_node_id = 0)
-            x1, y1 = member.get_coords(local_node_id = 1)
-            lw = member.A / A_max * 5 if member.A is not None else 1.0
-            if member in self.optional_members and member.A > 0.:
-                ax.plot([x0, x1], [y0, y1], color='gray', linestyle='dashed', lw=lw, label="Member", zorder=1)
-            else:
-                ax.plot([x0, x1], [y0, y1], color='gray',lw=lw, label="Member", zorder=1)
+        dx_dy_mean = np.mean([dx,dy])
+
+        # Plot nodes
+        for node_id, (x, y) in self.nodes.items():
+            if node_id not in self.supports.keys():
+                ax.plot(x, y, 'o', color='green', zorder=2)
+            ax.text(x - 0.05*dx_dy_mean, y - 0.05*dx_dy_mean, f"{node_id}", fontsize=12, zorder=3)
+
+        # Plot members
+        A_max = max([member.A for member in self.members if member.exists]) if any(member.A > 0. for member in self.members) else 1.0
+
+        for i_member, member in enumerate(self.members):
+            if member.exists:
+                x0, y0 = member.get_coords(local_node_id = 0)
+                x1, y1 = member.get_coords(local_node_id = 1)
+                lw = max(member.A / A_max * 5, 0.1)
+                label = "Member" if i_member == 0 else None
+                if member in self.optional_members:
+                    ax.plot([x0, x1], [y0, y1], color='gray', linestyle='dashed', lw=lw, label=label, zorder=1)
+                else:
+                    ax.plot([x0, x1], [y0, y1], color='gray',lw=lw, label=label, zorder=1)
 
         # Plot loads
         for node_id, (Fx, Fy) in self.loads.items():
@@ -277,16 +287,41 @@ class TrussStructure(Problem):
         plt.title("Truss Structure: " + subtitle)
         if self.output_path is not None:
             plt.savefig(self.output_path / f"truss_structure_{subtitle.lower().replace(' ', '_')}.png", dpi=600)
-        else:
+        if interactive:
             plt.show()
+        plt.close(fig)
+
+    def get_existent_members_and_involved_nodes(self):
+        """
+        Filter out non-existent members (with zero cross-sectional area) and nodes without any existent member.
+        """
+
+        existent_members = {}
+        involved_nodes = []
+
+        for i_member, member in enumerate(self.members):
+            if member.A > 0.:
+                existent_members[i_member] = member
+                node_id_0 = member.node_id_0
+                node_id_1 = member.node_id_1
+                involved_nodes.append(node_id_0)
+                involved_nodes.append(node_id_1)
+        involved_nodes = list(set(involved_nodes))
+
+        return existent_members, involved_nodes
+
+
 
     def compute_member_forces(self):
         """
         Compute axial forces in the truss members using the method of joints.
         :return: Dictionary of member forces: {(node_1_id, node_2_id): force}.
         """
+
+        members, nodes = self.get_existent_members_and_involved_nodes()
+
         # Number of nodes
-        num_nodes = len(self.nodes)
+        num_nodes = len(nodes)
 
         # Initialize global force matrix and displacement vector
         num_equations = 2 * num_nodes  # Two equations per node (Fx and Fy)
@@ -294,7 +329,7 @@ class TrussStructure(Problem):
         global_force = np.zeros(num_equations)
 
         # Map node IDs to equation indices
-        node_index_map = {node_id: i for i, node_id in enumerate(self.nodes.keys())}
+        node_index_map = {node_id: i for i, node_id in enumerate(nodes)}
 
         # Assemble global force vector
         for node_id, (Fx, Fy) in self.loads.items():
@@ -304,48 +339,50 @@ class TrussStructure(Problem):
             global_force[index_y] += Fy
 
         # Assemble global stiffness matrix
-        for member in self.members:
-            node_id_0 = member.node_id_0
-            node_id_1 = member.node_id_1
-            # Get direction cosines
-            l, m = member.direction_cosines_0
-            L = member.length
+        for member in members.values():
+            if member.A > 0.:
+                node_id_0 = member.node_id_0
+                node_id_1 = member.node_id_1
+                # Get direction cosines
+                l, m = member.direction_cosines_0
+                L = member.length
 
-            # Get indices for the nodes
-            index_0_x = 2 * node_index_map[node_id_0]
-            index_0_y = index_0_x + 1
-            index_1_x = 2 * node_index_map[node_id_1]
-            index_1_y = index_1_x + 1
+                # Get indices for the nodes
+                index_0_x = 2 * node_index_map[node_id_0]
+                index_0_y = index_0_x + 1
+                index_1_x = 2 * node_index_map[node_id_1]
+                index_1_y = index_1_x + 1
 
-            # Stiffness matrix for the member
-            k = member.E * member.A / L
-            member_matrix = k * np.array([
-                [l**2, l*m, -l**2, -l*m],
-                [l*m, m**2, -l*m, -m**2],
-                [-l**2, -l*m, l**2, l*m],
-                [-l*m, -m**2, l*m, m**2]
-            ])
+                # Stiffness matrix for the member
+                k = member.E * member.A / L
+                member_matrix = k * np.array([
+                    [l**2, l*m, -l**2, -l*m],
+                    [l*m, m**2, -l*m, -m**2],
+                    [-l**2, -l*m, l**2, l*m],
+                    [-l*m, -m**2, l*m, m**2]
+                ])
 
-            # Add member stiffness matrix to global stiffness matrix
-            global_matrix[index_0_x:index_0_y+1, index_0_x:index_0_y+1] += member_matrix[:2, :2]
-            global_matrix[index_0_x:index_0_y+1, index_1_x:index_1_y+1] += member_matrix[:2, 2:]
-            global_matrix[index_1_x:index_1_y+1, index_0_x:index_0_y+1] += member_matrix[2:, :2]
-            global_matrix[index_1_x:index_1_y+1, index_1_x:index_1_y+1] += member_matrix[2:, 2:]
+                # Add member stiffness matrix to global stiffness matrix
+                global_matrix[index_0_x:index_0_y+1, index_0_x:index_0_y+1] += member_matrix[:2, :2]
+                global_matrix[index_0_x:index_0_y+1, index_1_x:index_1_y+1] += member_matrix[:2, 2:]
+                global_matrix[index_1_x:index_1_y+1, index_0_x:index_0_y+1] += member_matrix[2:, :2]
+                global_matrix[index_1_x:index_1_y+1, index_1_x:index_1_y+1] += member_matrix[2:, 2:]
 
         # Apply support conditions
         for node_id, (x_fixed, y_fixed) in self.supports.items():
-            index_x = 2 * node_index_map[node_id]
-            index_y = index_x + 1
-            if x_fixed:
-                global_matrix[index_x, :] = 0
-                global_matrix[:, index_x] = 0
-                global_matrix[index_x, index_x] = 1
-                global_force[index_x] = 0
-            if y_fixed:
-                global_matrix[index_y, :] = 0
-                global_matrix[:, index_y] = 0
-                global_matrix[index_y, index_y] = 1
-                global_force[index_y] = 0
+            if node_id in nodes:
+                index_x = 2 * node_index_map[node_id]
+                index_y = index_x + 1
+                if x_fixed:
+                    global_matrix[index_x, :] = 0
+                    global_matrix[:, index_x] = 0
+                    global_matrix[index_x, index_x] = 1
+                    global_force[index_x] = 0
+                if y_fixed:
+                    global_matrix[index_y, :] = 0
+                    global_matrix[:, index_y] = 0
+                    global_matrix[index_y, index_y] = 1
+                    global_force[index_y] = 0
 
         # Solve for displacements
         displacements = np.linalg.solve(global_matrix, global_force)
@@ -353,7 +390,7 @@ class TrussStructure(Problem):
 
         # Compute member forces
         member_forces = {}
-        for i_member, member in enumerate(self.members):
+        for i_member, member in members.items():
             node_id_0 = member.node_id_0
             node_id_1 = member.node_id_1
             l, m = member.direction_cosines_0
@@ -383,16 +420,32 @@ class TrussStructure(Problem):
         self.generate_member_stress_polys(n_qubits_per_var, binary_representation, lower_lim, upper_lim)
         self.generate_member_area_polys()
 
+    def has_adaptive_variables(self):
+        return self.binary_representation == 'adaptive_range'
+
     def get_number_of_adaptive_vars(self):
         if self.binary_representation == 'adaptive_range':
-            return self.n_members
+            return np.array([self.n_members])
         else:
-            return 0
+            return np.array([0])
 
     def get_adaptive_vars(self, member_stresses_sol, member_areas_sol):
-        return member_stresses_sol
+        if self.binary_representation == 'adaptive_range':
+            return [member_stresses_sol]
+        else:
+            return None
 
-    def update_formulation(self):
+    def get_real_number_object(self, i_group):
+            return self.real_number
+
+    def get_range_limits(self, i_group):
+        assert(i_group == 0)
+        if self.binary_representation == 'adaptive_range':
+            return self.a_min, self.a_max
+        else:
+            return None, None
+
+    def update_formulation(self, solution_bit_array):
         self.update_member_stress_polys()
         self.generate_member_area_polys()
 
@@ -565,6 +618,13 @@ class TrussStructure(Problem):
         elif results is None and hasattr(self, 'results'):
             results = self.results
 
+        # Prepare mapping from variable IDs to bitstring positions for decoding.
+        self.bitstring_pos = {}
+        i_pos = 0
+        for var in self.binary_model.variables:
+            self.bitstring_pos[var.id] = i_pos
+            i_pos +=1
+
         solutions = [{'objective': np.inf} for _ in range(len(results))]
         best_solution = None
         for i_result, result in enumerate(results):
@@ -578,8 +638,16 @@ class TrussStructure(Problem):
             joint_residuals_sol = joint_residuals_x_sol + joint_residuals_y_sol
             constraints_sol = joint_residuals_sol
             volume_residual_sol= 0.0
-            if hasattr(self, 'target_volume'):
-                volume_residual_sol = (volume_sol-self.target_volume)/self.target_volume
+            if hasattr(self, 'target_volume') and hasattr(self, 'volume_constraint'):
+                if self.target_volume > 0.0:
+                    if self.volume_constraint == 'equality':
+                        volume_residual_sol = (volume_sol-self.target_volume)/self.target_volume
+                    elif self.volume_constraint == 'inequality':
+                         volume_residual_sol = max(0.0, (volume_sol-self.target_volume)/self.target_volume)
+                    else:
+                        raise Exception(f'Unknown volume constraint type ({self.volume_constraint}).')
+                else:
+                    volume_residual_sol = volume_sol
                 constraints_sol.extend([volume_residual_sol])
             volume_residual_squared_sol = volume_residual_sol**2
             constraints_squared_sum_sol = joint_residuals_squared_sum_sol + volume_residual_squared_sol
@@ -592,7 +660,7 @@ class TrussStructure(Problem):
             solutions[i_result]['member_forces'] = member_forces_sol
             solutions[i_result]['member_stresses'] = member_stresses_sol
             solutions[i_result]['member_areas'] = member_areas_sol
-            solutions[i_result]['continuous_vars'] = self.get_adaptive_vars(member_stresses_sol, member_areas_sol)
+            solutions[i_result]['adaptive_vars'] = self.get_adaptive_vars(member_stresses_sol, member_areas_sol)
             solutions[i_result]['complementary_energy'] = complementary_energy_sol
             solutions[i_result]['volume'] = volume_sol
             solutions[i_result]['volume_residual_squared'] = volume_residual_squared_sol
@@ -616,7 +684,7 @@ class TrussStructure(Problem):
         print(f"Volume: {best_solution['volume']}")
         print(f"Volume residual (squared): {best_solution['volume_residual_squared']}")
         print(f"Member Forces: {best_solution['member_forces']}")
-        print(f"Member Stresses: {best_solution['continuous_vars']}")
+        print(f"Member Stresses: {best_solution['member_stresses']}")
         print(f"Member Areas: {best_solution['member_areas']}")
         if hasattr(self, 'ts_ref'):
             print(f"Average Relative Error in Member Forces: {best_solution['avg_rel_error_forces']}")
@@ -627,8 +695,10 @@ class TrussStructure(Problem):
 
     def decode_member_stress_solution(self, result):
         member_stress_sol = []
-        for member_stress_poly in self.member_stress_polys:
-            if type(result) is SampleView:
+        for i_member, member_stress_poly in enumerate(self.member_stress_polys):
+            if not self.members[i_member].exists:
+                member_stress_sol.append(0.)
+            elif type(result) is SampleView:
                 member_stress_sol.append(self.decode_amplify_poly_with_bitstring(member_stress_poly,result._data))
             else:
                 member_stress_sol.append(member_stress_poly.decode(result.values))

@@ -69,50 +69,62 @@ class Problem(ABC):
 
     # Support for adaptive encoding of continuous variables
     # -----------------------------------------------------
+    def has_adaptive_variables(self):
+        return False
+
     def get_number_of_adaptive_vars(self):
         return 0
 
-    def get_position_in_bit_array(self, i_var):
-        start = i_var * self.n_qubits_per_var
-        end = (i_var + 1) * self.n_qubits_per_var
+    def get_position_in_bit_array(self, i_group, i_var):
+        start = None
+        end = None
         return start, end
 
-    def update_ranges(self, sol_bit_array, sol, sol_prev, relaxation_factor, verbose=False):
+    def get_real_number_object(self, i_group):
+        return None
 
-        n_vars = self.get_number_of_adaptive_vars()
-        if n_vars == 0:
-            raise Exception('Attempt to update ranges, but number of continuous variables is zero.')
+    def get_range_limits(self, i_group):
+        return None, None
+
+    def update_ranges(self, sol_bit_array, i_group, sol, sol_prev, relaxation_factor, verbose=False):
+
+        n_adaptive_vars_per_group = self.get_number_of_adaptive_vars()
+        n_vars = n_adaptive_vars_per_group[i_group]
+
         actions = ['' for _ in range(n_vars)]
         sol_decoded = [np.nan for _ in range(n_vars)]
         sol_decoded_new = [np.nan for _ in range(n_vars)]
         sol_encoded = [[] for _ in range(n_vars)]
         sol_encoded_new = [[] for _ in range(n_vars)]
         for i_var in range(n_vars):
-
             # Extract bit array for current variable
-            start, end = self.get_position_in_bit_array(i_var)
+            start, end = self.get_position_in_bit_array(i_group, i_var)
 
             sol_encoded[i_var] = sol_bit_array[start:end]
 
-            sol_decoded[i_var] = self.real_number.decode_bits_to_real(
-                sol_encoded[i_var], self.a_min[i_var], self.a_max[i_var])
+            real_number = self.get_real_number_object(i_group)
 
-            self.a_min[i_var], self.a_max[i_var], actions[i_var] = self.real_number.update_range(
-                sol[i_var], sol_encoded[i_var], sol_prev[i_var], self.a_min[i_var], self.a_max[i_var],
+            a_min, a_max = self.get_range_limits(i_group)
+
+            sol_decoded[i_var] = real_number.decode_bits_to_real(
+                sol_encoded[i_var], a_min[i_var], a_max[i_var])
+
+            a_min[i_var], a_max[i_var], actions[i_var] = real_number.update_range(
+                sol[i_var], sol_encoded[i_var], sol_prev[i_var], a_min[i_var], a_max[i_var],
                 relaxation_factor, verbose
             )
 
-            sol_encoded_new[i_var] = self.real_number.encode_real_to_bits(
-                sol[i_var], self.a_min[i_var], self.a_max[i_var])
+            sol_encoded_new[i_var] = real_number.encode_real_to_bits(
+                sol[i_var], a_min[i_var], a_max[i_var])
 
-            sol_decoded_new[i_var] = self.real_number.decode_bits_to_real(
-                sol_encoded_new[i_var], self.a_min[i_var], self.a_max[i_var]
+            sol_decoded_new[i_var] = real_number.decode_bits_to_real(
+                sol_encoded_new[i_var], a_min[i_var], a_max[i_var]
             )
 
         return actions, sol_decoded, sol_decoded_new, sol_encoded, sol_encoded_new
 
     def update_solution(self, sol_bit_array, sol_encoded):
-        n_vars = self.get_number_of_adaptive_vars()
+        n_vars = len(sol_encoded)
         for i_var in range(n_vars):
             start = i_var * self.n_qubits_per_var
             end = (i_var + 1) * self.n_qubits_per_var
@@ -261,6 +273,9 @@ class Problem(ABC):
                 term_value = coeff
             else:
                 # Product of variables in the tuple
-                term_value = coeff * np.prod([bitstring[i] for i in vars_tuple])
+                if hasattr(self, 'bitstring_pos'):
+                    term_value = coeff * np.prod([bitstring[self.bitstring_pos[i]] for i in vars_tuple])
+                else:
+                    term_value = coeff * np.prod([bitstring[i] for i in vars_tuple])
             value += term_value
         return float(value)

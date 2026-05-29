@@ -9,7 +9,7 @@ class RealNumber:
     The base class itself is not meant to be instantiated directly, but rather serves as a factory for creating
     instances of the appropriate subclass based on the specified binary representation.
     """
-    def __new__(cls, n_qubits, binary_representation, a_min=None, a_max=None):
+    def __new__(cls, n_qubits, binary_representation, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None):
         if cls is RealNumber:
             registry = {
                 'real': Real,
@@ -23,14 +23,15 @@ class RealNumber:
             if subcls is None:
                 raise Exception('Unknown binary representation', binary_representation)
             obj = super().__new__(subcls)  # create instance of subclass
-            subcls.__init__(obj, n_qubits, binary_representation, a_min, a_max)  # initialize subclass
+             # initialize subclass
+            subcls.__init__(obj, n_qubits, binary_representation, a_min, a_max, a_min_lim, a_max_lim)
             obj.binary_representation = binary_representation
             return obj
         # If called on a subclass directly, proceed normally
         return super().__new__(cls)
 
     # Keep the original signature; not used in practice on the base.
-    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None):
+    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None):
         self.n_qubits = n_qubits
         self.binary_representation = binary_representation
 
@@ -84,7 +85,7 @@ class RealNumber:
         return q_opt, diff_opt, diff_opt_rel
 
 class Real(RealNumber):
-    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None):
+    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None):
         self.n_qubits = n_qubits
         if not ((self.n_qubits % 2) == 0 and self.n_qubits >= 6):
             raise Exception('Number of qubits has to be even and >=6 for real representation.')
@@ -97,7 +98,7 @@ class Real(RealNumber):
         return a
 
 class RealReduced(RealNumber):
-    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None):
+    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None):
         self.n_qubits = n_qubits
         if not ((self.n_qubits % 2) == 0 and self.n_qubits >= 4):
             raise Exception('Number of qubits has to be even and >=4 for real_reduced representation.')
@@ -109,7 +110,7 @@ class RealReduced(RealNumber):
         return a
 
 class RealPositive(RealNumber):
-    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None):
+    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None):
         self.n_qubits = n_qubits
         if not ((self.n_qubits % 2) == 1 and self.n_qubits >= 3):
             raise Exception('Number of qubits has to be odd and >=3 for real_positive representation.')
@@ -124,7 +125,7 @@ class Normalized(RealNumber):
     """
     Normalized representation of a real number in the range [0, 1].
     """
-    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None):
+    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None):
         self.n_qubits = n_qubits
 
     def evaluate(self, q, a_min=None, a_max=None):
@@ -136,7 +137,7 @@ class Range(RealNumber):
     """
     Range representation of a real number in the range [a_min, a_max].
     """
-    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None):
+    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None):
         self.n_qubits = n_qubits
         self.a_min = a_min
         self.a_max = a_max
@@ -156,8 +157,10 @@ class AdaptiveRange(Range):
     """
     Adaptive range representation of a real number in the adaptive range [a_min, a_max].
     """
-    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None):
+    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None ):
         super().__init__(n_qubits, binary_representation, a_min, a_max)
+        self.a_min_lim = a_min_lim
+        self.a_max_lim = a_max_lim
 
     def set_range(self, a_min, a_max):
         if a_max <= a_min:
@@ -205,6 +208,21 @@ class AdaptiveRange(Range):
                 print(f"  All qubits are 0, expanding range in negative direction.")
             a_min -= 0.25 * delta
             actions.append("min ▼")
+
+        # Enforce limits
+        if self.a_min_lim is not None:
+            if a_min < self.a_min_lim:
+                if verbose:
+                    print(f"  Clamping a_min to limit {self.a_min_lim}")
+                a_min = self.a_min_lim
+                actions.append("min ==")
+
+        if self.a_max_lim is not None:
+            if a_max > self.a_max_lim:
+                if verbose:
+                    print(f"  Clamping a_max to limit {self.a_max_lim}")
+                a_max = self.a_max_lim
+                actions.append("max ==")
 
         if old_min != a_min or old_max != a_max:
             if verbose:
