@@ -435,6 +435,11 @@ class TrussStructure(Problem):
         else:
             return None
 
+    def get_position_in_bit_array(self, i_group, i_var):
+        start = i_var * self.n_qubits_per_var
+        end = (i_var + 1) * self.n_qubits_per_var
+        return start, end
+
     def get_real_number_object(self, i_group):
             return self.real_number
 

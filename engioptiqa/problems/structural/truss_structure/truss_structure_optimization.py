@@ -107,12 +107,22 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
     def get_position_in_bit_array(self, i_group, i_var):
 
         n_existent_members = self.get_number_of_existent_members()
+
+        if not self.members[i_var].exists:
+            return None, None
+        n_previous_existent_members = 0
+        for i_member in range(i_var):
+            if self.members[i_member].exists:
+                n_previous_existent_members +=1
+
         if i_group == 0:
-            start = i_var * self.n_qubits_per_var
-            end = (i_var + 1) * self.n_qubits_per_var
+            offset = n_previous_existent_members * self.n_qubits_per_var
+            start = offset
+            end = offset + self.n_qubits_per_var
         elif i_group == 1:
-            start = n_existent_members * self.n_qubits_per_var + i_var * self.n_qubits_per_area
-            end = n_existent_members * self.n_qubits_per_var + (i_var + 1) * self.n_qubits_per_area
+            offset = n_existent_members * self.n_qubits_per_var + n_previous_existent_members * self.n_qubits_per_area
+            start = offset
+            end = offset + self.n_qubits_per_area
         else:
             raise Exception(f"Invalid group index: {i_group}.")
         return start, end
@@ -168,7 +178,6 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
         member_area_polys = []
         member_areas = self.get_member_areas()
         i_optional_member = 0
-        i_active_member = 0
         for i_member, _ in enumerate(self.members):
             if self.members[i_member] in self.optional_members:
                 if not self.members[i_member].exists:
@@ -183,9 +192,18 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
                         if self.binary_representation_area == 'adaptive_range':
                             self.real_number_areas.set_range(self.A_min[i_member], self.A_max[i_member])
                         member_area_polys.append(self.real_number_areas.evaluate(q))
-                    i_active_member += 1
                 i_optional_member += 1
             else:
                 A = member_areas[i_member]
                 member_area_polys.append(A)
         self.member_area_polys = member_area_polys
+
+    def update_solution(self, i_group,sol_bit_array, sol_encoded):
+
+        n_vars = len(sol_encoded)
+        for i_var in range(n_vars):
+            if not self.members[i_var].exists:
+                continue
+            start, end = self.get_position_in_bit_array(i_group, i_var)
+            sol_bit_array[start:end] = sol_encoded[i_var]
+        return sol_bit_array

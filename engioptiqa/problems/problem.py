@@ -3,6 +3,7 @@ from amplify import AcceptableDegrees, VariableGenerator
 from dimod import BinaryQuadraticModel as BinaryQuadraticModelDWave
 from dimod.views.samples import SampleView
 from dimod.sampleset import SampleSet
+from engioptiqa.variables import real_number
 import matplot2tikz
 from matplotlib import pyplot as plt
 import numpy as np
@@ -91,39 +92,42 @@ class Problem(ABC):
         n_adaptive_vars_per_group = self.get_number_of_adaptive_vars()
         n_vars = n_adaptive_vars_per_group[i_group]
 
+        real_number = self.get_real_number_object(i_group)
+        a_min, a_max = self.get_range_limits(i_group)
+
         actions = ['' for _ in range(n_vars)]
         sol_decoded = [np.nan for _ in range(n_vars)]
         sol_decoded_new = [np.nan for _ in range(n_vars)]
         sol_encoded = [[] for _ in range(n_vars)]
         sol_encoded_new = [[] for _ in range(n_vars)]
         for i_var in range(n_vars):
+
             # Extract bit array for current variable
             start, end = self.get_position_in_bit_array(i_group, i_var)
+            if start is not None and end is not None and start < end:
 
-            sol_encoded[i_var] = sol_bit_array[start:end]
+                sol_encoded[i_var] = sol_bit_array[start:end]
 
-            real_number = self.get_real_number_object(i_group)
+                sol_decoded[i_var] = real_number.decode_bits_to_real(
+                    sol_encoded[i_var], a_min[i_var], a_max[i_var])
 
-            a_min, a_max = self.get_range_limits(i_group)
+                a_min[i_var], a_max[i_var], actions[i_var] = real_number.update_range(
+                    sol[i_var], sol_encoded[i_var], sol_prev[i_var], a_min[i_var], a_max[i_var],
+                    relaxation_factor, verbose
+                )
 
-            sol_decoded[i_var] = real_number.decode_bits_to_real(
-                sol_encoded[i_var], a_min[i_var], a_max[i_var])
+                sol_encoded_new[i_var] = real_number.encode_real_to_bits(
+                    sol[i_var], a_min[i_var], a_max[i_var])
 
-            a_min[i_var], a_max[i_var], actions[i_var] = real_number.update_range(
-                sol[i_var], sol_encoded[i_var], sol_prev[i_var], a_min[i_var], a_max[i_var],
-                relaxation_factor, verbose
-            )
-
-            sol_encoded_new[i_var] = real_number.encode_real_to_bits(
-                sol[i_var], a_min[i_var], a_max[i_var])
-
-            sol_decoded_new[i_var] = real_number.decode_bits_to_real(
-                sol_encoded_new[i_var], a_min[i_var], a_max[i_var]
-            )
+                sol_decoded_new[i_var] = real_number.decode_bits_to_real(
+                    sol_encoded_new[i_var], a_min[i_var], a_max[i_var]
+                )
+            else:
+                actions[i_var] = '-'
 
         return actions, sol_decoded, sol_decoded_new, sol_encoded, sol_encoded_new
 
-    def update_solution(self, sol_bit_array, sol_encoded):
+    def update_solution(self, i_group, sol_bit_array, sol_encoded):
         n_vars = len(sol_encoded)
         for i_var in range(n_vars):
             start = i_var * self.n_qubits_per_var
