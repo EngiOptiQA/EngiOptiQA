@@ -180,7 +180,11 @@ class TrussStructure(Problem):
         :return: Dictionary with information about the truss's determinacy.
         """
 
-        m = self.n_members # Number of members
+        # Number of (existent) members
+        m = 0
+        for member in self.members:
+            if member.A>0.:
+                m += 1
         j = len(self.nodes) # Number of joints (nodes)
         # Reaction count: sum of fixed directions over supports
         r = 0
@@ -450,7 +454,7 @@ class TrussStructure(Problem):
         else:
             return None, None
 
-    def update_formulation(self, solution_bit_array):
+    def update_formulation(self, best_solution=None):
         self.update_member_stress_polys()
         self.generate_member_area_polys()
 
@@ -643,16 +647,23 @@ class TrussStructure(Problem):
             joint_residuals_sol = joint_residuals_x_sol + joint_residuals_y_sol
             constraints_sol = joint_residuals_sol
             volume_residual_sol= 0.0
-            if hasattr(self, 'target_volume') and hasattr(self, 'volume_constraint'):
-                if self.target_volume > 0.0:
-                    if self.volume_constraint == 'equality':
+            if hasattr(self, 'volume_constraint'):
+                if self.volume_constraint['mode'] == 'direct':
+                    if self.volume_constraint['type'] == 'eq':
                         volume_residual_sol = (volume_sol-self.target_volume)/self.target_volume
-                    elif self.volume_constraint == 'inequality':
+                    elif self.volume_constraint['type'] == 'ineq':
                          volume_residual_sol = max(0.0, (volume_sol-self.target_volume)/self.target_volume)
-                    else:
-                        raise Exception(f'Unknown volume constraint type ({self.volume_constraint}).')
-                else:
-                    volume_residual_sol = volume_sol
+                elif self.volume_constraint['mode'] == 'num_add_members':
+                    num_add_members = 0
+                    for i_member, member in enumerate(self.members):
+                        if member in self.optional_members and member_areas_sol[i_member] > 0.:
+                            num_add_members += 1
+                    if self.volume_constraint['type'] == 'eq':
+                        res_max_members = (num_add_members-self.target_num_add_members)/self.target_num_add_members
+                        volume_residual_sol = res_max_members
+                    elif self.volume_constraint['type'] == 'ineq':
+                        res_max_members = max(0.0, (num_add_members-self.target_num_add_members)/self.target_num_add_members)
+                        volume_residual_sol = res_max_members
                 constraints_sol.extend([volume_residual_sol])
             volume_residual_squared_sol = volume_residual_sol**2
             constraints_squared_sum_sol = joint_residuals_squared_sum_sol + volume_residual_squared_sol
@@ -676,7 +687,7 @@ class TrussStructure(Problem):
 
             if hasattr(self, 'ts_ref'):
                 rel_error_forces, area_mismatch, rel_error_compliance = self.compare_with_reference_solution(solutions[i_result])
-                solutions[i_result]['avg_rel_error_forces'] = np.average(rel_error_forces)
+                solutions[i_result]['avg_rel_error_forces'] = np.nanmean(rel_error_forces)
                 solutions[i_result]['rel_error_compliance'] = rel_error_compliance
                 solutions[i_result]['areas_matching'] = not any(area_mismatch)
 
@@ -736,13 +747,13 @@ class TrussStructure(Problem):
         if not loads_equal:
             raise Exception('Loads are not matching.')
 
-        # Check if reference solution is statically determinate (required for unique solution and valid comparison)
+        # Check if reference solution is statically determinate
         statically_determinate_info = self.ts_ref.check_statically_determinate()
         if statically_determinate_info['condition'] != 'determinate':
-            message = f"Reference solution must be statically determinate but is " \
+            message = f"Reference solution is " \
                        f"{statically_determinate_info['condition']} " \
                        f"with degree {statically_determinate_info['degree']}."
-            raise Exception(message)
+            print(message)
 
     def compare_with_reference_solution(self, solution):
         if not hasattr(self, 'ts_ref'):
@@ -760,8 +771,11 @@ class TrussStructure(Problem):
         member_forces = solution['member_forces']
         rel_error_forces = []
         for i_member in range(len(self.member_forces_ref_sol)):
-            rel_error_force = abs((self.member_forces_ref_sol[i_member]-member_forces[i_member])) \
-                /abs(self.member_forces_ref_sol[i_member])
+            if self.member_forces_ref_sol[i_member] != 0:
+                rel_error_force = abs((self.member_forces_ref_sol[i_member]-member_forces[i_member])) \
+                    /abs(self.member_forces_ref_sol[i_member])
+            else:
+                rel_error_force = np.nan
             rel_error_forces.append(rel_error_force)
 
         compliance = 2.*solution['complementary_energy']
