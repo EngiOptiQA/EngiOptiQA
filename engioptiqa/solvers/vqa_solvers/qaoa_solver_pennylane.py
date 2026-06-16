@@ -5,6 +5,7 @@ import numpy
 import pennylane as qml
 from pennylane import numpy as np
 from pennylane import qaoa
+import time
 from types import SimpleNamespace
 
 class QAOASolver:
@@ -102,6 +103,39 @@ class QAOASolverPennylane(QAOASolver):
             return qml.expval(self.H_cost)
 
         return expectation_circuit
+
+
+    def apply_bitflip_noise(self, samples, p=0.01, rng=None):
+        """
+        Apply independent bit-flip (readout) noise to sampled bitstrings.
+
+        Args:
+            samples: array-like of shape (n_shots, n_qubits)
+                    or a single bitstring of shape (n_qubits,)
+            p: probability of flipping each bit (0 <= p <= 1)
+            rng: optional np.random.Generator for reproducibility
+
+        Returns:
+            Noisy samples with same shape as input
+        """
+        if rng is None:
+            rng = np.random.default_rng()
+
+        samples = np.asarray(samples)
+
+        # Handle single bitstring case
+        single = False
+        if samples.ndim == 1:
+            samples = samples[None, :]
+            single = True
+
+        # Generate flip mask: True = flip bit
+        flip_mask = rng.random(samples.shape) < p
+
+        # XOR flips bits (0->1, 1->0)
+        noisy = np.bitwise_xor(samples, flip_mask.astype(np.int8))
+
+        return noisy[0] if single else noisy
 
     def qaoa_sample_circuit(self):
 
@@ -207,7 +241,13 @@ class QAOASolverPennylane(QAOASolver):
 
         if circuit == 'sample':
             sample_circuit = qml.set_shots(shots)(self.qaoa_sample_circuit())
+            t0 = time.perf_counter()
             samples = sample_circuit(betas, gammas)
+            noisy_samples = self.apply_bitflip_noise(samples, p=0.05)
+            samples = noisy_samples
+            t1 = time.perf_counter()
+
+            print(f"Sampling completed in {t1 - t0:.3f} s")
 
             counts = defaultdict(int)
             for row in samples:
