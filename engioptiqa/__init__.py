@@ -5,6 +5,8 @@ __all__ = [
     "AnnealingSolverDWave",
     "AnnealingSolverOpenJij",
     "DesignOptimizationProblemRod1D",
+    "PowerFlow",
+    "PowerFlowData",
     "Rod1D",
     "StructuralAnalysisProblemRod1D",
     "TrussStructure",
