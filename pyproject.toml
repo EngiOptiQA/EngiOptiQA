@@ -19,7 +19,7 @@ dependencies = [
     "matplot2tikz~=0.5",
     "matplotlib~=3.10",
     "numpy~=2.0",
-    "openjij~=0.11",
+    "pandas~=2.3",
     "prettytable~=3.17",
     "sympy~=1.14"
 ]
