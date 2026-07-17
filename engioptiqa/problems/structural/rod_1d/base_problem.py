@@ -9,6 +9,7 @@ from dimod import BinaryQuadraticModel as BinaryQuadraticModelDWave
 from dimod import cqm_to_bqm, lp
 from dimod.views.samples import SampleView
 from dimod.sampleset import SampleSet
+import math
 import matplot2tikz
 from matplotlib import pyplot as plt
 import matplotlib.patches as patches
@@ -35,14 +36,11 @@ class BaseProblemRod1D(Problem):
 
         self.x_sym = sp.symbols('x')
 
-        self.table = PrettyTable()
-        self.table.field_names =\
-            ['Cross Sections', 'Complementary Energy', 'Compliance']
 
     def capabilities(self):
         return super().capabilities() | {"outeropt_penalty", "outeropt_augmented_lagrangian"}
 
-    def analytical_complementary_energy_and_compliance(self, A_combi):
+    def analytical_complementary_energy_and_compliance(self, cross_sections):
 
         n_comp = self.rod.n_comp
         x = self.rod.x
@@ -50,52 +48,36 @@ class BaseProblemRod1D(Problem):
         rho = self.rod.rho
         g = self.g
 
-        PI_combi = []
-        C_combi = []
-        for i_A_combi in range(len(A_combi)):
+        A = cross_sections
+        PI = 0.0
+        C  = 0.0
+        tmp_rod_1d = Rod1D(n_comp, self.rod.L, A)
 
-            A = A_combi[i_A_combi]
-            tmp_rod_1d = Rod1D(n_comp, self.rod.L,A)
+        # Stress
+        stress = self.compute_stress_function(tmp_rod_1d)
 
-            # Stresses
-            stress = self.compute_stress_function(tmp_rod_1d)
+        # Displacement
+        u = self.compute_displacement_function(stress, tmp_rod_1d)
 
-            # Displacement
-            u = self.compute_displacement_function(stress, tmp_rod_1d)
+        # Complementary Energy
+        PI_elem = []
+        for i_comp in range(n_comp):
+            expr = A[i_comp]/E[i_comp] * stress[i_comp]**2
+            PI_elem.append(1./2. * sp.integrate(expr,(self.x_sym, x[i_comp], x[i_comp+1])))
+        PI = sum(PI_elem)
 
-            # Complementary Energy
-            PI_elem = []
-            for i_comp in range(n_comp):
-                expr = A[i_comp]/E[i_comp] * stress[i_comp]**2
-                PI_elem.append(1./2. * sp.integrate(expr,(self.x_sym, x[i_comp], x[i_comp+1])))
-            PI_combi.append(sum(PI_elem))
+        # Compliance
+        C_elem = []
+        for i_comp in range(n_comp):
+            vol_force = rho[i_comp]*g
+            expr = stress[i_comp]/E[i_comp]
+            C_elem.append(A[i_comp]*sp.integrate(vol_force*u[i_comp], (self.x_sym, x[i_comp], x[i_comp+1])))
+        C = sum(C_elem)
 
-            # Compliance
-            C_elem = []
-            for i_comp in range(n_comp):
-                vol_force = rho[i_comp]*g
-                expr = stress[i_comp]/E[i_comp]
-                C_elem.append(A[i_comp]*sp.integrate(vol_force*u[i_comp], (self.x_sym, x[i_comp], x[i_comp+1])))
-            C_combi.append(sum(C_elem))
+        # Sanity check.
+        assert(math.isclose(PI, C/2.0, rel_tol=1e-9))
 
-            # Sanity check.
-            assert(round(C_combi[-1], 5) == round(2*PI_combi[-1], 5))
-
-        # Print as table.
-        data = []
-        for i in range(len(A_combi)):
-            data.append({'Cross Sections': A_combi[i], \
-                         'Complementary Energy': PI_combi[i], \
-                         'Compliance': C_combi[i],})
-
-        for row in data:
-            self.table.add_row([row['Cross Sections'], row['Complementary Energy'], row['Compliance']])
-
-        self.table.sortby = 'Complementary Energy'
-
-        self.print_and_log(self.table.get_string()+'\n')
-
-        self.PI_combi, self.C_combi, self.A_combi = PI_combi, C_combi, A_combi
+        return PI, C
 
     def compute_stress_function(self, rod):
 
@@ -137,6 +119,19 @@ class BaseProblemRod1D(Problem):
             u.append(u[-1].subs(self.x_sym, x[i_comp]) + sp.integrate(expr, (self.x_sym, x[i_comp], self.x_sym)))
 
         return u
+
+    def compute_analytical_solution(self):
+        output = "Analytical Solution:\n"
+        self.A_analytic = self.get_analytical_cross_sections()
+        output += f"\tCross Sections: {self.A_analytic}\n"
+        self.PI_analytic, self.C_analytic = self.analytical_complementary_energy_and_compliance(self.A_analytic)
+        output += f"\tComplementary Energy: {self.PI_analytic}\n\tCompliance: {self.C_analytic}\n"
+        self.rod.cross_sections = self.A_analytic
+        self.stress_analytic = self.compute_stress_function(self.rod)
+        self.force_analytic = self.compute_force_function(self.stress_analytic, self.rod)
+        self.displacement_analytic = self.compute_displacement_function(self.stress_analytic, self.rod)
+        output += f'\tForce: {self.force_analytic}\n'
+        self.print_and_log(output)
 
     # Generate Basis Functions.
     def basis(self, xi, xj, x_sym):

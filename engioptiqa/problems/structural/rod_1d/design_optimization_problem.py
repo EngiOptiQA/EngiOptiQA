@@ -6,6 +6,7 @@ import matplotlib.patches as patches
 import numpy as np
 import os
 import matplot2tikz
+import sympy as sp
 
 from .rod_1d import Rod1D
 from .base_problem import BaseProblemRod1D
@@ -19,45 +20,25 @@ class DesignOptimizationProblemRod1D(BaseProblemRod1D):
         self.name = 'Design Optimization Problem'
         self.print_and_log(self.name+'\n')
 
-    def analytical_complementary_energy_and_compliance(self):
-        A_combi = list(itertools.product([self.A_choice[0], self.A_choice[1]], repeat=self.rod.n_comp))
-        super().analytical_complementary_energy_and_compliance(A_combi)
+    def get_analytical_cross_sections(self):
 
-    def get_optimal_solution(self):
+        L = self.rod.L
+        A1 = self.A_choice[0]
+        A2 = self.A_choice[1]
 
-        combi_opt = self.PI_combi.index(min(self.PI_combi))
+        opt_condition = sp.Eq((3*A1-A2)*self.x_sym**2 - 4*A1*L*self.x_sym + A1*L**2, 0)
+        x_opt_val =sp.solve(opt_condition, self.x_sym)
+        x_feasible = [x_val for x_val in x_opt_val if x_val > 0 and x_val <= L]
+        if len(x_feasible) != 1:
+            raise ValueError(f"Expected one valid solution for x in the range (0, {L}], but got \
+                             {len(x_feasible)} valid solutions: {x_feasible}")
+        x_opt = x_feasible[0]
+        dx = L/self.rod.n_comp
+        i_opt = round(x_opt/dx)
 
-        self.A_opt = self.A_combi[combi_opt]
-        self.PI_opt = self.PI_combi[combi_opt]
-        self.C_opt = self.C_combi[combi_opt]
+        A_opt = [A2 if i < i_opt else A1 for i in range(self.rod.n_comp)]
 
-        output = 'Optimal Solution:\n'
-        output+= f'\tCross Section: {self.A_opt}\n'
-        output+= f'\tComplementary Energy: {self.PI_opt}\n'
-        output+= f'\tCompliance: {self.C_opt}\n'
-        self.print_and_log(output)
-
-    def compute_analytical_solution(self):
-        self.analytical_complementary_energy_and_compliance()
-        self.get_optimal_solution()
-
-        self.A_analytic = self.A_opt
-        self.PI_analytic = self.PI_opt
-        self.C_analytic = self.C_opt
-
-        self.rod_1d_opt = Rod1D(self.rod.n_comp,self.rod.L,0)
-        self.rod_1d_opt.cross_sections = self.A_opt
-        if self.output_path is not None:
-            file_name = os.path.join(self.output_path,'rod_optimal.png')
-        else:
-            file_name = None
-        self.rod_1d_opt.visualize(file_name, self.save_fig)
-        self.stress_analytic = self.compute_stress_function(self.rod_1d_opt)
-        self.force_analytic = self.compute_force_function(self.stress_analytic, self.rod_1d_opt)
-        self.displacement_analytic = self.compute_displacement_function(self.stress_analytic, self.rod_1d_opt)
-
-        output = f'Analytic Force: {self.force_analytic}\n'
-        self.print_and_log(output)
+        return A_opt
 
     def compare_designs(self, solution):
         cs = [1./solution['cs_inv'][i] for i in range(self.rod.n_comp)]

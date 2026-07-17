@@ -1,4 +1,5 @@
 import itertools
+import numpy as np
 from .base_problem import BaseProblemRod1D
 
 class StructuralAnalysisProblemRod1D(BaseProblemRod1D):
@@ -9,21 +10,8 @@ class StructuralAnalysisProblemRod1D(BaseProblemRod1D):
 
         self.print_and_log(self.name+'\n')
 
-    def analytical_complementary_energy_and_compliance(self):
-        A_combi = list(itertools.product([self.rod.A], repeat=self.rod.n_comp))
-        super().analytical_complementary_energy_and_compliance(A_combi)
-
-    def compute_analytical_solution(self):
-        self.analytical_complementary_energy_and_compliance()
-        self.A_analytic = self.rod.cross_sections
-        self.PI_analytic = self.PI_combi[0]
-        self.C_analytic = self.C_combi[0]
-        self.stress_analytic = self.compute_stress_function(self.rod)
-        self.force_analytic = self.compute_force_function(self.stress_analytic, self.rod)
-        self.displacement_analytic = self.compute_displacement_function(self.stress_analytic, self.rod)
-
-        output = f'Analytic Force: {self.force_analytic}\n'
-        self.print_and_log(output)
+    def get_analytical_cross_sections(self):
+        return np.ones(self.rod.n_comp)*self.rod.A
 
     def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
         BaseProblemRod1D.initialize_discretization(self)
