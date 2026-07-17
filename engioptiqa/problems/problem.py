@@ -243,29 +243,36 @@ class Problem(ABC):
             else:
                 return np.nan
 
-    def analyze_results(self, results=None):
+    def get_best_solution(self, results=None):
         """
-        Analyze results computed or returned by a solver.
+        Get best solution (minimum energy) from results computed or returned by a solver.
 
         :param results: Optional results to analyze. If not provided, will attempt to use `self.results` computed by
             a solver.
 
-        :return: List of solutions (dictionaries) containing information (bit array, energy, frequency).
+        :return: Best solution (dictionary) containing information (bit array, energy, frequency).
         """
         if results is None and not hasattr(self, 'results'):
             raise Exception('Attempt to analyze results, but no results exist or have been passed.')
         elif results is None and hasattr(self, 'results'):
             results = self.results
 
-        solutions = [{} for _ in range(len(results))]
+        best_solution = None
+        best_energy = np.inf
         for i_result, result in enumerate(results):
             bit_array = self.get_bit_array(result)
+            energy = self.get_energy(i_result)
+            frequency = self.get_frequency(i_result)
 
-            solutions[i_result]['bit_array'] = bit_array
-            solutions[i_result]['energy'] = self.get_energy(i_result)
-            solutions[i_result]['frequency'] = self.get_frequency(i_result)
+            if energy < best_energy:
+                best_energy = energy
+                best_solution = {
+                    'bit_array': bit_array,
+                    'energy': energy,
+                    'frequency': frequency
+                }
 
-        return solutions
+        return best_solution
 
     def decode_amplify_poly_with_bitstring(self, amplify_poly, bitstring):
 

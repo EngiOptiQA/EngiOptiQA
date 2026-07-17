@@ -61,22 +61,15 @@ annealing_solver_sa.solve_problem(
     num_reads=200,
     )
 
-# Analyze Solution
-# ================
-solutions_sa = optimization_problem.analyze_results(result_max=0)
-
 # Get the Best Solution, i.e., with Minimum Objective Value
-# ---------------------------------------------------------
-objectives = [d['objective'] for d in solutions_sa]
-i_min = np.argsort(objectives)
-i_sol = i_min[0]
-solution = solutions_sa[i_sol]
+# =========================================================
+best_solution = optimization_problem.get_best_solution()
 
 # Plot Force Distribution for the Best Solution
 # ---------------------------------------------
 optimization_problem.plot_force(
     optimization_problem.force_analytic,
-    solution['force'],
+    best_solution['force'],
     subtitle='Simulated Annealing',
     file_name= str(output_path / "force_sa"),
     save_fig = True,

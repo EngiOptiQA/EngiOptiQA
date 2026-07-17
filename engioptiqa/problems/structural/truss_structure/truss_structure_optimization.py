@@ -98,7 +98,16 @@ class TrussStructureOptimization(TrussStructure):
     def generate_problem_formulation(self, penalty_weight=1.0, lagrange_multipliers=[], mode='penalty'):
         super().generate_complementary_energy_poly()
         self.generate_constraint_polys()
-        super().generate_objective_poly(penalty_weight=penalty_weight, lagrange_multipliers=lagrange_multipliers, mode=mode)
+
+        self.constrained_opt_mode = mode
+        self.penalty_weight = penalty_weight
+        self.lagrange_multipliers = lagrange_multipliers
+
+        self.poly = super().objective(
+            self.complementary_energy_poly,
+            self.constraints_sum_squared_poly,
+            self.constraint_polys
+        )
 
         self.binary_model = Model(self.poly)
 

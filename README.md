@@ -25,10 +25,11 @@ pip install -r requirements.txt
 python3 examples/structural/rod_1d/design_optimization_sa.py
 ```
 
-The expected $H_1$ error for the best solution is approximately $1.59 \times 10^{-2}$:
+The expected relative $H_1$ error for the force function of the best solution is approximately $1.59 \times 10^{-2}$:
 
 ```bash
-H1 Error 0.015873015873015817 0.015873015873015817
+Force:
+   Rel. H1 error 1.5873e-02
 ```
 
 ## Funding

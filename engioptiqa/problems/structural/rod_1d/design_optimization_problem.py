@@ -59,6 +59,17 @@ class DesignOptimizationProblemRod1D(BaseProblemRod1D):
         output = f'Analytic Force: {self.force_analytic}\n'
         self.print_and_log(output)
 
+    def compare_designs(self, solution):
+        cs = [1./solution['cs_inv'][i] for i in range(self.rod.n_comp)]
+        design_match = cs == list(self.A_analytic)
+        output = f"Design match {design_match}\n"
+        if not design_match:
+            count = sum(x != y for x, y in zip(cs, list(self.A_analytic)))
+            output += f"Number of mismatched components = {count}\n"
+            output += f"Design (Solution)   = {cs}\n"
+            output += f"Design (Analytical) = {list(self.A_analytic)}\n"
+        return output
+
     def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
         BaseProblemRod1D.initialize_discretization(self)
         BaseProblemRod1D.generate_nodal_force_polys(self, n_qubits_per_var, binary_representation, lower_lim, upper_lim)

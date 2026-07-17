@@ -284,23 +284,29 @@ class BaseProblemRod1D(Problem):
         self.equilibrium_constraint_polys = eq_cons
         self.equilibrium_constraints_squared_sum_poly =  eq_cons_sq_sum
 
+    def objective(self, complementary_energy, equilibrium_constraints_squared_sum, equilibrium_constraints):
+        if self.constrained_opt_mode == 'penalty' or self.constrained_opt_mode == 'augmented_lagrangian':
+            obj = complementary_energy + self.penalty_weight*equilibrium_constraints_squared_sum
+            if self.constrained_opt_mode == 'augmented_lagrangian':
+                for i, lagrange_multiplier in enumerate(self.lagrange_multipliers):
+                    obj -= lagrange_multiplier * equilibrium_constraints[i]
+            return obj
+        else:
+            raise Exception(f'Unknown mode ({self.constrained_opt_mode}) to compute objective.')
+
     def generate_problem_formulation(self, penalty_weight = 1.0, lagrange_multipliers = [], mode = 'penalty'):
         self.generate_complementary_energy_poly()
         self.generate_constraint_polys()
 
-        if mode == 'penalty' or mode == 'augmented_lagrangian':
-            self.penalty_weight = penalty_weight
-            print(f"Penalty weight: {self.penalty_weight}\n")
-            self.poly = self.complementary_energy_poly + \
-                self.penalty_weight * self.equilibrium_constraints_squared_sum_poly
-            if mode == 'augmented_lagrangian':
-                if len(lagrange_multipliers) != self.rod.n_comp:
-                    raise Exception('Number of Lagrange multipliers must be equal to number of components' \
-                                    f'({self.rod.n_comp}).')
-                for i, lagrange_multiplier in enumerate(lagrange_multipliers):
-                    self.poly -= lagrange_multiplier * self.equilibrium_constraint_polys[i]
-        else:
-            raise Exception(f'Unknown mode ({mode}) for problem formulation.')
+        self.constrained_opt_mode = mode
+        self.penalty_weight = penalty_weight
+        self.lagrange_multipliers = lagrange_multipliers
+
+        self.poly = self.objective(
+            self.complementary_energy_poly,
+            self.equilibrium_constraints_squared_sum_poly,
+            self.equilibrium_constraint_polys
+        )
 
         self.binary_model = Model(self.poly)
 
@@ -309,9 +315,11 @@ class BaseProblemRod1D(Problem):
 
     def update_penalty_weight_in_problem_formulation(self, penalty_weight = 1.0):
         self.penalty_weight = penalty_weight
-        print(f"Penalty weight (equilibrium): {self.penalty_weight}\n")
-        self.poly = self.complementary_energy_poly + \
-            self.penalty_weight * self.equilibrium_constraints_squared_sum_poly
+        self.poly = self.objective(
+            self.complementary_energy_poly,
+            self.equilibrium_constraints_squared_sum_poly,
+            self.equilibrium_constraint_polys
+        )
 
         self.binary_model = Model(self.poly)
 
@@ -368,26 +376,22 @@ class BaseProblemRod1D(Problem):
             plt.show()
         plt.close()
 
-    def analyze_results(self, results=None, analysis_plots=True, compute_errors=True, result_max=sys.maxsize):
+    def get_best_solution(self, results=None):
+        """
+        Get best solution (minimum objective) from results computed or returned by a solver.
 
+        :param results: Optional results to analyze. If not provided, will attempt to use `self.results` computed by
+            a solver.
+
+        :return: Best solution (dictionary).
+        """
         if results is None and not hasattr(self, 'results'):
             raise Exception('Attempt to analyze results, but no results exist or have been passed.')
         elif results is None and hasattr(self, 'results'):
             results = self.results
 
-        compute_symbolic_functions = analysis_plots or compute_errors
-
-        self.errors_force_rel = [np.inf for _ in range(len(results))]
-        solutions = [{'error_abs': np.inf, 'energy': np.inf} for _ in range(len(results))]
-        solutions = [{} for _ in range(len(results))]
-
-        self.errors_l2_rel = []
-        self.errors_h1_rel = []
-        self.objectives = []
-        self.comp_energies = []
-        self.errors_comp_energy_rel = []
-        self.cs_inv =[]
-        self.cs = []
+        # Extract best solution (minimum objective value) from results.
+        best_objective = np.inf
         for i_result, result in enumerate(results):
             bit_array = self.get_bit_array(result)
             # Decode solution, i.e., evaluate nodal forces and inverse of cross sections.
@@ -398,89 +402,51 @@ class BaseProblemRod1D(Problem):
             # Evaluate constraints.
             eq_cons, eq_cons_sq_sum, traction_bc_con_sq = self.constraints(nf_sol, cs_inv_sol)
             # Compute objective function.
-            obj_sol = PI_sol + self.penalty_weight*eq_cons_sq_sum
+            obj_sol = self.objective(PI_sol, eq_cons_sq_sum, eq_cons)
 
-            solutions[i_result]['bit_array'] = bit_array
-            solutions[i_result]['complementary_energy'] = PI_sol
-            solutions[i_result]['constraints'] = eq_cons
-            solutions[i_result]['constraints_squared_sum'] = eq_cons_sq_sum
-            solutions[i_result]['objective'] = obj_sol
-            solutions[i_result]['energy'] = self.get_energy(i_result)
-            solutions[i_result]['frequency'] = self.get_frequency(i_result)
-            solutions[i_result]['nf'] = nf_sol
-            solutions[i_result]['cs_inv'] = cs_inv_sol
-            solutions[i_result]['adaptive_vars'] = self.get_adaptive_vars(nf_sol)
+            if obj_sol < best_objective:
+                best_solution = {
+                    'bit_array': bit_array,
+                    'complementary_energy': PI_sol,
+                    'constraints': eq_cons,
+                    'constraints_squared_sum': eq_cons_sq_sum,
+                    'objective': obj_sol,
+                    'energy': self.get_energy(i_result),
+                    'frequency': self.get_frequency(i_result),
+                    'nf': nf_sol,
+                    'cs_inv': cs_inv_sol,
+                    'cs': [1/cs_inv for cs_inv in cs_inv_sol],
+                    'adaptive_vars': self.get_adaptive_vars(nf_sol)
+                }
+                best_objective = obj_sol
 
+        # Prepare symbolic force and stress functions.
+        nf_sol = best_solution['nf']
+        cs_inv_sol = best_solution['cs_inv']
+        force_sol, stress_sol = self.symbolic_force_and_stress_functions(nf_sol, cs_inv_sol)
+        best_solution['force'] = force_sol
+        best_solution['stress'] = stress_sol
+        # Compute errors in force.
+        error_l2_force_abs, error_l2_force_rel = self.rel_error_l2(self.force_analytic, force_sol)
+        error_h1_force_abs, error_h1_force_rel = self.rel_error_h1(self.force_analytic, force_sol)
+        best_solution['error_l2_abs'] = error_l2_force_abs
+        best_solution['error_l2_rel'] = error_l2_force_rel
+        best_solution['error_h1_abs'] = error_h1_force_abs
+        best_solution['error_h1_rel'] = error_h1_force_rel
 
-            self.objectives.append(obj_sol)
-            self.comp_energies.append(PI_sol)
-            self.errors_comp_energy_rel.append(abs(PI_sol-self.PI_analytic)/abs(self.PI_analytic))
-            self.cs_inv.append(cs_inv_sol)
-            self.cs.append([1/cs_inv for cs_inv in cs_inv_sol])
-
-            if compute_symbolic_functions:
-                # Compute symbolic force and stress functions.
-                force_sol, stress_sol = self.symbolic_force_and_stress_functions(nf_sol, cs_inv_sol)
-                solutions[i_result]['force'] = force_sol
-            if compute_errors:
-                # Compute error with respect to analytic solution.
-                error_l2_force_abs, error_l2_force_rel = self.rel_error_l2(self.force_analytic, force_sol)
-                error_h1_force_abs, error_h1_force_rel = self.rel_error_h1(self.force_analytic, force_sol)
-
-                self.errors_force_rel[i_result] = error_l2_force_rel
-                solutions[i_result]['error_l2_abs'] = error_l2_force_abs
-                solutions[i_result]['error_l2_rel'] = error_l2_force_rel
-                solutions[i_result]['error_h1_abs'] = error_h1_force_abs
-                solutions[i_result]['error_h1_rel'] = error_h1_force_rel
-
-                self.errors_l2_rel.append(error_l2_force_rel)
-                self.errors_h1_rel.append(error_h1_force_rel)
-
-            # Output of analysis.
-            if i_result < result_max:
-                output = f'Solution {i_result}\n'
-                output+= f"\tenergy = {solutions[i_result]['energy']}, frequency = {solutions[i_result]['frequency']}\n"
-                self.print_and_log(output)
-                self.print_nodal_force_and_cross_section_inverse(nf_sol, cs_inv_sol)
-                if compute_errors:
-                    self.print_solution_quantities(PI_sol, eq_cons, eq_cons_sq_sum, traction_bc_con_sq, obj_sol, error_l2_force_abs, error_l2_force_rel)
-                # Plot Solution
-                if analysis_plots:
-                    if self.output_path is not None:
-                        file_name_force = os.path.join(self.output_path,'force_solution_'+str(i_result)+'.png')
-                        file_name_stress = os.path.join(self.output_path,'stress_solution_'+str(i_result)+'.png')
-                        file_name_rod = os.path.join(self.output_path,'rod_solution_'+str(i_result)+'.png')
-                    else:
-                        file_name_force = None
-                        file_name_stress = None
-                        file_name_rod = None
-                    self.plot_force(self.force_analytic, force_sol, file_name=file_name_force, save_fig=self.save_fig)
-                    self.plot_stress(self.stress_analytic, stress_sol, file_name=file_name_stress, save_fig=self.save_fig)
-                    rod_tmp = Rod1D(self.rod.n_comp, self.rod.L, 0.0)
-                    rod_tmp.set_cross_sections_from_inverse(cs_inv_sol)
-                    rod_tmp.visualize(file_name=file_name_rod, save_fig=self.save_fig)
-
-        output = 'Best solution (minimum objective):\n'
-        i_min =np.argsort(self.objectives)
-        i_sol = i_min[0]
-        if compute_errors:
-            error_l2 = solutions[i_sol]['error_l2_rel']
-            error_h1 = solutions[i_sol]['error_h1_rel']
-            output += f'L2 Error {error_l2} {self.errors_l2_rel[i_sol]}\nH1 Error {error_h1} {self.errors_h1_rel[i_sol]}\n'
+        output =  'Best solution (minimum objective):\n'
+        output += '----------------------------------\n'
+        output += f'Constraints (squared sum) {best_solution["constraints_squared_sum"]:.4e}\n'
+        if hasattr(self, 'compare_designs'):
+            output += self.compare_designs(best_solution)
+        output += f'Force:\n\tRel. L2 error {error_l2_force_rel:.4e}\n\tRel. H1 error {error_h1_force_rel:.4e}\n'
+        complementary_energy = best_solution['complementary_energy']
+        complementary_energy_ref = self.PI_analytic
+        rel_error_complementary_energy = abs(complementary_energy-complementary_energy_ref)/abs(complementary_energy_ref)
+        output += f"Complementary energy = {complementary_energy}\n\tRel. error: {rel_error_complementary_energy:.4e}\n"
         self.print_and_log(output)
 
-        return solutions
-
-    def print_solution_quantities(self, PI_sol, eq_cons, eq_cons_sq_sum, traction_bc_con_sq, obj_sol, error_force_abs, error_force_rel):
-            output = f'\tComplementary Energy = {PI_sol:.15g} ({self.PI_analytic:.15g})\n'
-            output+= f'\tConstraints Squared Sum = {eq_cons_sq_sum:.15g}\n'
-            quadratic_penalty_term_sol = self.penalty_weight*eq_cons_sq_sum
-            output+= f'\tQuadratic Penalty Term = {quadratic_penalty_term_sol:.15g}\n'
-            output+= f'\tObjective = {obj_sol:.15g}\n'
-            output+= f'\tAbsolute Error = {error_force_abs:.15g}\n'
-            output+= f'\tRelative Error = {error_force_rel:.15g}\n'
-
-            self.print_and_log(output)
+        return best_solution
 
     def decode_nodal_force_solution(self, result):
         nf_sol = []
