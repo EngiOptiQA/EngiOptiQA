@@ -11,9 +11,10 @@ from types import SimpleNamespace
 class QAOASolver:
     def __init__(self, token_file=None, proxy=None, *args, **kwargs):
         self.proxy = proxy
+        self.token = None
         if token_file is not None:
-            self.token = open(token_file,"r").read().replace('\n', '')
-
+            with open(token_file, "r", encoding="utf-8") as f:
+                self.token = f.read().strip()
 class QAOASolverPennylane(QAOASolver):
     def __init__(self, token_file=None, proxy=None, *args, **kwargs):
         super().__init__(token_file=token_file, proxy=proxy, *args, **kwargs)
