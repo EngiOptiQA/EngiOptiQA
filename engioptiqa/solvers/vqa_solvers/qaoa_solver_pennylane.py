@@ -23,6 +23,8 @@ class QAOASolverPennylane(QAOASolver):
         wires = range(self.n_qubits)
 
         if device == 'MQSSPennylaneDevice':
+            if not getattr(self, "token", None):
+                raise ValueError("A token file must be provided when using MQSSPennylaneDevice.")
             self.dev = MQSSPennylaneDevice(wires=wires, token=self.token, backends='EQE1')
         else:
             self.dev = qml.device(device, wires=wires)
@@ -206,7 +208,7 @@ class QAOASolverPennylane(QAOASolver):
             raise ValueError("Number of shots must be a positive integer.")
 
         # Convert the binary polynomial to an Ising polynomial
-        binary_poly_dict = problem.binary_model.objective.asdict()
+        binary_poly_dict = problem.binary_model.objective.as_dict()
         ising_poly_dict = self.convert_binary_to_ising(binary_poly_dict)
 
         # Determine the number of qubits
