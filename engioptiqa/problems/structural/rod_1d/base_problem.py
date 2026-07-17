@@ -379,6 +379,30 @@ class BaseProblemRod1D(Problem):
             plt.show()
         plt.close()
 
+    def evaluate_result(self, result):
+
+        # Decode solution, i.e., evaluate nodal forces and inverse of cross sections.
+        nf_sol = self.decode_nodal_force_solution(result)
+        cs_inv_sol = self.decode_cross_section_inverse_solution(result)
+        # Compute complementary energy.
+        PI_sol =  self.complementary_energy(nf_sol, cs_inv_sol)
+        # Evaluate constraints.
+        eq_cons, eq_cons_sq_sum, traction_bc_con_sq = self.constraints(nf_sol, cs_inv_sol)
+        # Compute objective function.
+        obj_sol = self.objective(PI_sol, eq_cons_sq_sum, eq_cons)
+
+        solution = {
+            'complementary_energy': PI_sol,
+            'constraints': eq_cons,
+            'constraints_squared_sum': eq_cons_sq_sum,
+            'objective': obj_sol,
+            'nf': nf_sol,
+            'cs_inv': cs_inv_sol,
+            'cs': [1/cs_inv for cs_inv in cs_inv_sol],
+            'adaptive_vars': self.get_adaptive_vars(nf_sol)
+        }
+        return solution
+
     def get_best_solution(self, results=None):
         """
         Get best solution (minimum objective) from results computed or returned by a solver.
@@ -395,32 +419,14 @@ class BaseProblemRod1D(Problem):
 
         # Extract best solution (minimum objective value) from results.
         best_objective = np.inf
-        for i_result, result in enumerate(results):
+        for result in results:
+            solution = self.evaluate_result(result)
             bit_array = self.get_bit_array(result)
-            # Decode solution, i.e., evaluate nodal forces and inverse of cross sections.
-            nf_sol = self.decode_nodal_force_solution(result)
-            cs_inv_sol = self.decode_cross_section_inverse_solution(result)
-            # Compute complementary energy.
-            PI_sol =  self.complementary_energy(nf_sol, cs_inv_sol)
-            # Evaluate constraints.
-            eq_cons, eq_cons_sq_sum, traction_bc_con_sq = self.constraints(nf_sol, cs_inv_sol)
-            # Compute objective function.
-            obj_sol = self.objective(PI_sol, eq_cons_sq_sum, eq_cons)
+            solution['bit_array'] = bit_array
+            obj_sol = solution['objective']
 
             if obj_sol < best_objective:
-                best_solution = {
-                    'bit_array': bit_array,
-                    'complementary_energy': PI_sol,
-                    'constraints': eq_cons,
-                    'constraints_squared_sum': eq_cons_sq_sum,
-                    'objective': obj_sol,
-                    'energy': self.get_energy(i_result),
-                    'frequency': self.get_frequency(i_result),
-                    'nf': nf_sol,
-                    'cs_inv': cs_inv_sol,
-                    'cs': [1/cs_inv for cs_inv in cs_inv_sol],
-                    'adaptive_vars': self.get_adaptive_vars(nf_sol)
-                }
+                best_solution = solution
                 best_objective = obj_sol
 
         # Prepare symbolic force and stress functions.

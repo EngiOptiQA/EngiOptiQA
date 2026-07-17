@@ -631,6 +631,59 @@ class TrussStructure(Problem):
         else:
             raise Exception(f'Unknown mode ({self.constrained_opt_mode}) to compute objective.')
 
+    def evaluate_result(self, result):
+
+        # Decode solution, i.e., evaluate nodal stress and member areas.
+        member_stresses_sol = self.decode_member_stress_solution(result)
+        member_areas_sol = self.decode_member_area_solution(result)
+        # Compute member forces, complementary energy, and volume.
+        member_forces_sol = [member_stresses_sol[i]*member_areas_sol[i] for i in range(len(member_stresses_sol))]
+        complementary_energy_sol = self.complementary_energy(member_stresses_sol, member_areas_sol)
+        volume_sol = self.total_volume(member_areas_sol)
+        # Evaluate constraints (joint residuals and volume constraint, if any).
+        joint_residuals_x_sol,  joint_residuals_y_sol, joint_residuals_squared_sum_sol = self.joint_residuals_squared_sum(member_stresses_sol, member_areas_sol)
+        joint_residuals_sol = joint_residuals_x_sol + joint_residuals_y_sol
+        constraints_sol = joint_residuals_sol
+        volume_residual_sol= 0.0
+        if hasattr(self, 'volume_constraint'):
+            if self.volume_constraint['mode'] == 'direct':
+                if self.volume_constraint['type'] == 'eq':
+                    volume_residual_sol = (volume_sol-self.target_volume)/self.target_volume
+                elif self.volume_constraint['type'] == 'ineq':
+                        volume_residual_sol = max(0.0, (volume_sol-self.target_volume)/self.target_volume)
+            elif self.volume_constraint['mode'] == 'num_add_members':
+                num_add_members = 0
+                for i_member, member in enumerate(self.members):
+                    if member in self.optional_members and member_areas_sol[i_member] > 0.:
+                        num_add_members += 1
+                if self.volume_constraint['type'] == 'eq':
+                    res_max_members = (num_add_members-self.target_num_add_members)/self.target_num_add_members
+                    volume_residual_sol = res_max_members
+                elif self.volume_constraint['type'] == 'ineq':
+                    res_max_members = max(0.0, (num_add_members-self.target_num_add_members)/self.target_num_add_members)
+                    volume_residual_sol = res_max_members
+            constraints_sol.extend([volume_residual_sol])
+        volume_residual_squared_sol = volume_residual_sol**2
+        constraints_squared_sum_sol = joint_residuals_squared_sum_sol + volume_residual_squared_sol
+        # Compute objective function.
+        objective_sol = self.objective(complementary_energy_sol, constraints_squared_sum_sol, constraints_sol)
+
+        solution = {
+            'member_forces': member_forces_sol,
+            'member_stresses': member_stresses_sol,
+            'member_areas': member_areas_sol,
+            'adaptive_vars': self.get_adaptive_vars(member_stresses_sol, member_areas_sol),
+            'complementary_energy': complementary_energy_sol,
+            'volume': volume_sol,
+            'volume_residual_squared': volume_residual_squared_sol,
+            'joint_residuals_squared_sum': joint_residuals_squared_sum_sol,
+            'constraints': constraints_sol,
+            'constraints_squared_sum': constraints_squared_sum_sol,
+            'objective': objective_sol
+        }
+
+        return solution
+
     def get_best_solution(self, results=None):
         """
         Get best solution (minimum objective) from results computed or returned by a solver.
@@ -640,7 +693,6 @@ class TrussStructure(Problem):
 
         :return: Best solution (dictionary).
         """
-
 
         if results is None and not hasattr(self, 'results'):
             raise Exception('Attempt to analyze results, but no results exist or have been passed.')
@@ -656,59 +708,14 @@ class TrussStructure(Problem):
 
         best_solution = None
         best_objective = np.inf
-        for i_result, result in enumerate(results):
+        for result in results:
+            solution = self.evaluate_result(result)
             bit_array = self.get_bit_array(result)
-            # Decode solution, i.e., evaluate nodal stress and member areas.
-            member_stresses_sol = self.decode_member_stress_solution(result)
-            member_areas_sol = self.decode_member_area_solution(result)
-            # Compute member forces, complementary energy, and volume.
-            member_forces_sol = [member_stresses_sol[i]*member_areas_sol[i] for i in range(len(member_stresses_sol))]
-            complementary_energy_sol = self.complementary_energy(member_stresses_sol, member_areas_sol)
-            volume_sol = self.total_volume(member_areas_sol)
-            # Evaluate constraints (joint residuals and volume constraint, if any).
-            joint_residuals_x_sol,  joint_residuals_y_sol, joint_residuals_squared_sum_sol = self.joint_residuals_squared_sum(member_stresses_sol, member_areas_sol)
-            joint_residuals_sol = joint_residuals_x_sol + joint_residuals_y_sol
-            constraints_sol = joint_residuals_sol
-            volume_residual_sol= 0.0
-            if hasattr(self, 'volume_constraint'):
-                if self.volume_constraint['mode'] == 'direct':
-                    if self.volume_constraint['type'] == 'eq':
-                        volume_residual_sol = (volume_sol-self.target_volume)/self.target_volume
-                    elif self.volume_constraint['type'] == 'ineq':
-                         volume_residual_sol = max(0.0, (volume_sol-self.target_volume)/self.target_volume)
-                elif self.volume_constraint['mode'] == 'num_add_members':
-                    num_add_members = 0
-                    for i_member, member in enumerate(self.members):
-                        if member in self.optional_members and member_areas_sol[i_member] > 0.:
-                            num_add_members += 1
-                    if self.volume_constraint['type'] == 'eq':
-                        res_max_members = (num_add_members-self.target_num_add_members)/self.target_num_add_members
-                        volume_residual_sol = res_max_members
-                    elif self.volume_constraint['type'] == 'ineq':
-                        res_max_members = max(0.0, (num_add_members-self.target_num_add_members)/self.target_num_add_members)
-                        volume_residual_sol = res_max_members
-                constraints_sol.extend([volume_residual_sol])
-            volume_residual_squared_sol = volume_residual_sol**2
-            constraints_squared_sum_sol = joint_residuals_squared_sum_sol + volume_residual_squared_sol
-            # Compute objective function.
-            objective_sol = self.objective(complementary_energy_sol, constraints_squared_sum_sol, constraints_sol)
+            solution['bit_array'] = bit_array
+            objective_sol = solution['objective']
 
             if objective_sol < best_objective:
-                best_solution = {
-                    'bit_array': bit_array,
-                    'member_forces': member_forces_sol,
-                    'member_stresses': member_stresses_sol,
-                    'member_areas': member_areas_sol,
-                    'adaptive_vars': self.get_adaptive_vars(member_stresses_sol, member_areas_sol),
-                    'complementary_energy': complementary_energy_sol,
-                    'volume': volume_sol,
-                    'volume_residual_squared': volume_residual_squared_sol,
-                    'joint_residuals_squared_sum': joint_residuals_squared_sum_sol,
-                    'constraints': constraints_sol,
-                    'constraints_squared_sum': constraints_squared_sum_sol,
-                    'objective': objective_sol
-                }
-
+                best_solution = solution
                 if hasattr(self, 'ts_ref'):
                     rel_error_forces, area_mismatch, rel_error_compliance = self.compare_with_reference_solution(best_solution)
                     best_solution['avg_rel_error_forces'] = np.nanmean(rel_error_forces)
