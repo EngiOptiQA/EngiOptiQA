@@ -650,7 +650,7 @@ class TrussStructure(Problem):
                 if self.volume_constraint['type'] == 'eq':
                     volume_residual_sol = (volume_sol-self.target_volume)/self.target_volume
                 elif self.volume_constraint['type'] == 'ineq':
-                        volume_residual_sol = max(0.0, (volume_sol-self.target_volume)/self.target_volume)
+                    volume_residual_sol = max(0.0, (volume_sol-self.target_volume)/self.target_volume)
             elif self.volume_constraint['mode'] == 'num_add_members':
                 num_add_members = 0
                 for i_member, member in enumerate(self.members):

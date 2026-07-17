@@ -1,7 +1,6 @@
 from collections import defaultdict
 import itertools
 from mqss.pennylane_adapter.device import MQSSPennylaneDevice
-import numpy
 import pennylane as qml
 from pennylane import numpy as np
 from pennylane import qaoa
@@ -33,7 +32,6 @@ class QAOASolverPennylane(QAOASolver):
     def convert_binary_to_ising(self, binary_poly_dict):
         ising_poly_dict = defaultdict(float)
 
-        ising_poly_dict = defaultdict(float)
         # Iterate over each term in the binary polynomial
         for term, binary_coeff in binary_poly_dict.items():
             degree = len(term)
