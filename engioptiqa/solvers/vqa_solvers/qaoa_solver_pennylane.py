@@ -196,7 +196,8 @@ class QAOASolverPennylane(QAOASolver):
 
         return pairs
 
-    def solve_problem(self, problem, num_layers=1, mode='fixed', device='lightning.qubit', circuit='probs', shots=None):
+    def solve_problem(self, problem, num_layers=1, mode='fixed',
+                      device='lightning.qubit', circuit='probs', shots=None, noise=False):
         print("Solving problem with Pennylane QAOA solver")
 
         if circuit == 'sample' and shots is None:
@@ -244,8 +245,9 @@ class QAOASolverPennylane(QAOASolver):
             sample_circuit = qml.set_shots(shots)(self.qaoa_sample_circuit())
             t0 = time.perf_counter()
             samples = sample_circuit(betas, gammas)
-            noisy_samples = self.apply_bitflip_noise(samples, p=0.05)
-            samples = noisy_samples
+            if noise == True:
+                noisy_samples = self.apply_bitflip_noise(samples, p=0.05)
+                samples = noisy_samples
             t1 = time.perf_counter()
 
             print(f"Sampling completed in {t1 - t0:.3f} s")
