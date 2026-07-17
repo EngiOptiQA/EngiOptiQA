@@ -10,4 +10,5 @@ numpy~=2.0
 openjij~=0.11
 pennylane==0.40
 prettytable~=3.17
+qiskit<2
 sympy~=1.14
