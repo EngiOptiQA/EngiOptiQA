@@ -1,5 +1,4 @@
 amplify[extra]~=1.5
-autoray<0.7.0
 dwave-cloud-client~=0.14
 dwave-samplers~=1.7
 dwave-system~=1.34
@@ -8,7 +7,8 @@ matplotlib~=3.10
 mqss-pennylane-adapter
 numpy~=2.0
 openjij~=0.11
-pennylane==0.40
+pennylane~=0.44
+pennylane-lightning
 prettytable~=3.17
 qiskit<2
 sympy~=1.14
