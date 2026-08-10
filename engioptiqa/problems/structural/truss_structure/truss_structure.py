@@ -183,10 +183,13 @@ class TrussStructure(Problem):
 
         # Number of (existent) members
         m = 0
+        connected_nodes = set()
         for member in self.members:
             if member.A>0.:
                 m += 1
-        j = len(self.nodes) # Number of joints (nodes)
+                connected_nodes.add(member.node_id_0)
+                connected_nodes.add(member.node_id_1)
+        j = len(connected_nodes)  # Number of joints connected to existent members
         # Reaction count: sum of fixed directions over supports
         r = 0
         for _, (xf, yf) in self.supports.items():
