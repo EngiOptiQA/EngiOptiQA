@@ -84,6 +84,10 @@ class TrussStructure(Problem):
 
         for i, member in enumerate(self.members):
             member.A = member_areas[i]
+            if abs(member_areas[i]) < 1e-12:
+                member.exists = False
+            else:
+                member.exists = True
 
     def get_member_areas(self):
         """
@@ -181,15 +185,9 @@ class TrussStructure(Problem):
         :return: Dictionary with information about the truss's determinacy.
         """
 
-        # Number of (existent) members
-        m = 0
-        connected_nodes = set()
-        for member in self.members:
-            if member.A>0.:
-                m += 1
-                connected_nodes.add(member.node_id_0)
-                connected_nodes.add(member.node_id_1)
-        j = len(connected_nodes)  # Number of joints connected to existent members
+        members, nodes = self.get_existent_members_and_involved_nodes()
+        m = len(members) # Number of existent members
+        j = len(nodes)   # Number of joints connected to existent members
         # Reaction count: sum of fixed directions over supports
         r = 0
         for _, (xf, yf) in self.supports.items():
@@ -245,7 +243,7 @@ class TrussStructure(Problem):
             ax.text(x - 0.05*dx_dy_mean, y - 0.05*dx_dy_mean, f"{node_id}", fontsize=12, zorder=3)
 
         # Plot members
-        A_max = max([member.A for member in self.members if member.exists]) if any(member.A > 0. for member in self.members) else 1.0
+        A_max = max([member.A for member in self.members if member.exists]) if any(member.exists for member in self.members) else 1.0
 
         for i_member, member in enumerate(self.members):
             if member.exists:
@@ -308,7 +306,7 @@ class TrussStructure(Problem):
         involved_nodes = []
 
         for i_member, member in enumerate(self.members):
-            if member.A > 0.:
+            if member.exists:
                 existent_members[i_member] = member
                 node_id_0 = member.node_id_0
                 node_id_1 = member.node_id_1
@@ -348,33 +346,32 @@ class TrussStructure(Problem):
 
         # Assemble global stiffness matrix
         for member in members.values():
-            if member.A > 0.:
-                node_id_0 = member.node_id_0
-                node_id_1 = member.node_id_1
-                # Get direction cosines
-                l, m = member.direction_cosines_0
-                L = member.length
+            node_id_0 = member.node_id_0
+            node_id_1 = member.node_id_1
+            # Get direction cosines
+            l, m = member.direction_cosines_0
+            L = member.length
 
-                # Get indices for the nodes
-                index_0_x = 2 * node_index_map[node_id_0]
-                index_0_y = index_0_x + 1
-                index_1_x = 2 * node_index_map[node_id_1]
-                index_1_y = index_1_x + 1
+            # Get indices for the nodes
+            index_0_x = 2 * node_index_map[node_id_0]
+            index_0_y = index_0_x + 1
+            index_1_x = 2 * node_index_map[node_id_1]
+            index_1_y = index_1_x + 1
 
-                # Stiffness matrix for the member
-                k = member.E * member.A / L
-                member_matrix = k * np.array([
-                    [l**2, l*m, -l**2, -l*m],
-                    [l*m, m**2, -l*m, -m**2],
-                    [-l**2, -l*m, l**2, l*m],
-                    [-l*m, -m**2, l*m, m**2]
-                ])
+            # Stiffness matrix for the member
+            k = member.E * member.A / L
+            member_matrix = k * np.array([
+                [l**2, l*m, -l**2, -l*m],
+                [l*m, m**2, -l*m, -m**2],
+                [-l**2, -l*m, l**2, l*m],
+                [-l*m, -m**2, l*m, m**2]
+            ])
 
-                # Add member stiffness matrix to global stiffness matrix
-                global_matrix[index_0_x:index_0_y+1, index_0_x:index_0_y+1] += member_matrix[:2, :2]
-                global_matrix[index_0_x:index_0_y+1, index_1_x:index_1_y+1] += member_matrix[:2, 2:]
-                global_matrix[index_1_x:index_1_y+1, index_0_x:index_0_y+1] += member_matrix[2:, :2]
-                global_matrix[index_1_x:index_1_y+1, index_1_x:index_1_y+1] += member_matrix[2:, 2:]
+            # Add member stiffness matrix to global stiffness matrix
+            global_matrix[index_0_x:index_0_y+1, index_0_x:index_0_y+1] += member_matrix[:2, :2]
+            global_matrix[index_0_x:index_0_y+1, index_1_x:index_1_y+1] += member_matrix[:2, 2:]
+            global_matrix[index_1_x:index_1_y+1, index_0_x:index_0_y+1] += member_matrix[2:, :2]
+            global_matrix[index_1_x:index_1_y+1, index_1_x:index_1_y+1] += member_matrix[2:, 2:]
 
         # Apply support conditions
         for node_id, (x_fixed, y_fixed) in self.supports.items():
