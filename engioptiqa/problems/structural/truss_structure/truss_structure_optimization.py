@@ -214,8 +214,8 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
 
         member_area_polys = []
         member_areas = self.get_member_areas()
+        i_optional_member = 0
         for i_member, _ in enumerate(self.members):
-            i_optional_member = 0
             if self.members[i_member] in self.optional_members:
                 q = self.variable_generator.array("Binary", self.n_qubits_per_area, name=f"q_A_{i_optional_member}")
                 member_area_polys.append(self.real_number_areas.evaluate(q))
