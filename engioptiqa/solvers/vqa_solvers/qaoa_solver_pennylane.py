@@ -98,7 +98,7 @@ class QAOASolverPennylane(QAOASolver):
         @qp.qnode(self.dev)
         def probability_circuit(betas, gammas):
             self.ansatz(betas, gammas)
-            return qp.probs(wires=self.readout_wires)
+            return qp.probs(wires=range(self.n_qubits))
 
         return probability_circuit
 
