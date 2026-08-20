@@ -40,7 +40,7 @@ optimization_problem.compute_analytical_solution()
 # -------------------------------
 qaoa_solver = QAOASolverPennylane()
 p = 5
-shots = 250
+shots = 500
 
 # Discretization through Binary Representation of Real-Valued Nodal Coefficients and Cross Section Choice
 # -------------------------------------------------------------------------------------------------------
