@@ -1,6 +1,5 @@
 from collections import defaultdict
 import itertools
-from mqss.pennylane_adapter.device import MQSSPennylaneDevice
 import pennylane as qml
 from pennylane import numpy as np
 from pennylane import qaoa
@@ -24,6 +23,13 @@ class QAOASolverPennylane(QAOASolver):
         if device == 'MQSSPennylaneDevice':
             if not getattr(self, "token", None):
                 raise ValueError("A token file must be provided when using MQSSPennylaneDevice.")
+            try:
+                from mqss.pennylane_adapter.device import MQSSPennylaneDevice
+            except ImportError as e:
+                raise ImportError(
+                    "The 'mqss-pennylane-adapter' package is required to use MQSSPennylaneDevice. "
+                    "Install it with the optional 'mqss' extra, e.g. `pip install engioptiqa[mqss]`."
+                ) from e
             self.dev = MQSSPennylaneDevice(wires=wires, token=self.token, backends='EQE1')
         else:
             self.dev = qml.device(device, wires=wires)
