@@ -27,8 +27,8 @@ class QAOASolverPennylane(QAOASolver):
                 from mqss.pennylane_adapter.device import MQSSPennylaneDevice
             except ImportError as e:
                 raise ImportError(
-                    "The 'mqss-pennylane-adapter' package is required to use MQSSPennylaneDevice. "
-                    "Install it with the optional 'mqss' extra, e.g. `pip install engioptiqa[mqss]`."
+                    "Optional MQSS dependencies are required to use MQSSPennylaneDevice. "
+                    "Install them with `pip install engioptiqa[mqss]`."
                 ) from e
             self.dev = MQSSPennylaneDevice(wires=wires, token=self.token, backends='EQE1')
         else:
