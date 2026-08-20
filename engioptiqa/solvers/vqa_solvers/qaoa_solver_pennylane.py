@@ -1,6 +1,6 @@
 from collections import defaultdict
 import itertools
-import pennylane as qml
+import pennylane as qp
 from pennylane import numpy as np
 from pennylane import qaoa
 import time
@@ -32,7 +32,7 @@ class QAOASolverPennylane(QAOASolver):
                 ) from e
             self.dev = MQSSPennylaneDevice(wires=wires, token=self.token, backends='EQE1')
         else:
-            self.dev = qml.device(device, wires=wires)
+            self.dev = qp.device(device, wires=wires)
 
 
     def convert_binary_to_ising(self, binary_poly_dict):
@@ -61,20 +61,20 @@ class QAOASolverPennylane(QAOASolver):
         ising_poly_dict.pop((), 0.0)
 
         for qubits, c in ising_poly_dict.items():
-            op = qml.PauliZ(qubits[0])
+            op = qp.PauliZ(qubits[0])
             for q in qubits[1:]:
-                op = op @ qml.PauliZ(q)
+                op = op @ qp.PauliZ(q)
             coeffs.append(c)
             ops.append(op)
 
-        self.H_cost = qml.Hamiltonian(coeffs, ops)
+        self.H_cost = qp.Hamiltonian(coeffs, ops)
 
         if normalize:
             coeffs = np.array(self.H_cost.coeffs, dtype=float)
 
             coeff_abs_max = np.max(np.abs(coeffs))
             coeffs_norm = (coeffs / coeff_abs_max).tolist()
-            self.H_cost = qml.Hamiltonian(coeffs_norm, self.H_cost.ops)
+            self.H_cost = qp.Hamiltonian(coeffs_norm, self.H_cost.ops)
 
     def construct_mixer_hamiltonian(self, scaling=True):
 
@@ -82,7 +82,7 @@ class QAOASolverPennylane(QAOASolver):
         if scaling:
             mean_coeff_abs = np.mean(np.abs(self.H_cost.coeffs))
             scale_factor = mean_coeff_abs if mean_coeff_abs != 0 else 1.0
-        self.H_mixer = qml.Hamiltonian([scale_factor]*self.n_qubits, [qml.PauliX(i) for i in range(self.n_qubits)])
+        self.H_mixer = qp.Hamiltonian([scale_factor]*self.n_qubits, [qp.PauliX(i) for i in range(self.n_qubits)])
 
     def qaoa_layer(self, beta, gamma):
         qaoa.cost_layer(gamma, self.H_cost)
@@ -90,24 +90,24 @@ class QAOASolverPennylane(QAOASolver):
 
     def qaoa_ansatz(self, betas, gammas):
         for w in range(self.n_qubits):
-            qml.Hadamard(wires=w)
-        qml.layer(self.qaoa_layer, self.num_layers, betas, gammas)
+            qp.Hadamard(wires=w)
+        qp.layer(self.qaoa_layer, self.num_layers, betas, gammas)
 
     def qaoa_probability_circuit(self):
 
-        @qml.qnode(self.dev)
+        @qp.qnode(self.dev)
         def probability_circuit(betas, gammas):
             self.ansatz(betas, gammas)
-            return qml.probs(wires=range(self.n_qubits))
+            return qp.probs(wires=self.readout_wires)
 
         return probability_circuit
 
     def qaoa_expectation_circuit(self):
 
-        @qml.qnode(self.dev, interface="auto", diff_method="best")
+        @qp.qnode(self.dev, interface="auto", diff_method="best")
         def expectation_circuit(betas, gammas):
             self.ansatz(betas, gammas)
-            return qml.expval(self.H_cost)
+            return qp.expval(self.H_cost)
 
         return expectation_circuit
 
@@ -146,10 +146,10 @@ class QAOASolverPennylane(QAOASolver):
 
     def qaoa_sample_circuit(self):
 
-        @qml.qnode(self.dev)
+        @qp.qnode(self.dev)
         def sample_circuit(betas, gammas):
             self.ansatz(betas, gammas)
-            return qml.sample(wires=range(self.n_qubits))
+            return qp.sample(wires=range(self.n_qubits))
 
         return sample_circuit
 
@@ -235,7 +235,7 @@ class QAOASolverPennylane(QAOASolver):
             betas = np.linspace(1, 0, self.num_layers)
             gammas = np.linspace(0, 1, self.num_layers)
         else:
-            self.optimizer = qml.AdamOptimizer()
+            self.optimizer = qp.AdamOptimizer()
             if mode == 'linear_ramp':
                 dbeta_initial = 1.
                 dgamma_initial = 1.
@@ -248,7 +248,7 @@ class QAOASolverPennylane(QAOASolver):
                 betas, gammas = self.optimize_parameters(betas_initial, gammas_initial)
 
         if circuit == 'sample':
-            sample_circuit = qml.set_shots(shots)(self.qaoa_sample_circuit())
+            sample_circuit = qp.set_shots(shots)(self.qaoa_sample_circuit())
             t0 = time.perf_counter()
             samples = sample_circuit(betas, gammas)
             if noise == True:
@@ -277,7 +277,7 @@ class QAOASolverPennylane(QAOASolver):
 
         elif circuit == 'probs':
             # For the final circuit, compute probabilities of all bitstrings
-            probability_circuit = qml.set_shots(shots)(self.qaoa_probability_circuit())
+            probability_circuit = qp.set_shots(shots)(self.qaoa_probability_circuit())
             probs = probability_circuit(betas, gammas)
             if probs.ndim == 2 and probs.shape[0] == 1:
                 probs = probs[0]
