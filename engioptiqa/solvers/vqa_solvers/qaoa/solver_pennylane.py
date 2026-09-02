@@ -60,11 +60,14 @@ class QAOASolverPennylane(QAOASolverBase):
     def select_parameters(self, mode, optimization_iterations):
         if mode == "fixed":
             return self.fixed_parameters()
-        return QAOAParameterOptimizer(
-            self.objective_function,
-            self.num_layers,
-            optimization_iterations=optimization_iterations,
-        ).optimize(mode)
+        elif mode in {"linear_ramp", "optimize"}:
+            return QAOAParameterOptimizer(
+                self.objective_function,
+                self.num_layers,
+                optimization_iterations=optimization_iterations,
+            ).optimize(mode)
+        else:
+            raise ValueError("mode must be 'fixed', 'linear_ramp', or 'optimize'.")
 
     def execute(self, problem, betas, gammas, circuit, shots):
         if circuit == "probs":

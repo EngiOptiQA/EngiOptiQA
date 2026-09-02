@@ -123,7 +123,6 @@ class QAOAParameterOptimizer:
             return self._optimize_linear_ramp()
         if mode == "optimize":
             return self._optimize_individual_parameters()
-        raise ValueError("mode must be 'fixed', 'linear_ramp', or 'optimize'.")
 
     def _optimize_individual_parameters(self):
         initial_betas = np.random.uniform(0, 1, self.num_layers)
