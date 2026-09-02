@@ -33,7 +33,7 @@ For the VQAs, there is an implementation of the *Quantum Approximate Optimizatio
 .. toctree::
    :maxdepth: 2
 
-   annealing_solvers
+   solvers/solvers
 
 .. _problems-module:
 
