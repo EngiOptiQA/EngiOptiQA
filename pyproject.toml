@@ -33,6 +33,10 @@ mqss = [
     "mqss-pennylane-adapter",
     "qiskit<2"
 ]
+# Only required for QAOASolverAQT, i.e. AQT's offline simulator via qiskit-aqt-provider.
+aqt = [
+    "qiskit-aqt-provider"
+]
 
 [tool.setuptools_scm]
 version_scheme = "post-release"
