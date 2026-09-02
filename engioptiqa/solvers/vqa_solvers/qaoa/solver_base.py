@@ -52,21 +52,21 @@ class QAOASolverBase(ABC):
             operators.append(operator)
 
         self.H_cost = qp.Hamiltonian(coeffs, operators)
-if normalize and self.H_cost.coeffs:
-    coeffs = np.array(self.H_cost.coeffs, dtype=float)
-    max_coefficient = np.max(np.abs(coeffs))
-    if max_coefficient:
-        self.H_cost = qp.Hamiltonian((coeffs / max_coefficient).tolist(), self.H_cost.ops)
+        if normalize and self.H_cost.coeffs:
+            coeffs = np.array(self.H_cost.coeffs, dtype=float)
+            max_coefficient = np.max(np.abs(coeffs))
+            if max_coefficient:
+                self.H_cost = qp.Hamiltonian((coeffs / max_coefficient).tolist(), self.H_cost.ops)
 
     def construct_mixer_hamiltonian(self, scaling=True):
         scale_factor = 1.0
-if scaling and self.H_cost.coeffs:
-    mean_coefficient = float(np.mean(np.abs(self.H_cost.coeffs)))
-    scale_factor = mean_coefficient if mean_coefficient and math.isfinite(mean_coefficient) else 1.0
-        self.H_mixer = qp.Hamiltonian(
-            [scale_factor] * self.n_qubits,
-            [qp.PauliX(qubit) for qubit in range(self.n_qubits)],
-        )
+        if scaling and self.H_cost.coeffs:
+            mean_coefficient = float(np.mean(np.abs(self.H_cost.coeffs)))
+            scale_factor = mean_coefficient if mean_coefficient and math.isfinite(mean_coefficient) else 1.0
+            self.H_mixer = qp.Hamiltonian(
+                [scale_factor] * self.n_qubits,
+                [qp.PauliX(qubit) for qubit in range(self.n_qubits)],
+            )
 
     def qaoa_layer(self, beta, gamma):
         qaoa.cost_layer(gamma, self.H_cost)
