@@ -42,9 +42,9 @@ class QAOASolverAQT(QAOASolverBase):
         qasm_device = qp.device("default.qubit", wires=self.n_qubits)
 
         @qp.qnode(qasm_device)
-def circuit(circuit_betas, circuit_gammas):
-    self.ansatz(circuit_betas, circuit_gammas)
-    return qp.sample(wires=range(self.n_qubits))
+        def circuit(circuit_betas, circuit_gammas):
+            self.ansatz(circuit_betas, circuit_gammas)
+            return qp.sample(wires=range(self.n_qubits))
 
         decomposed_circuit = qp.decompose(
             circuit, gate_set={"H", "RX", "RY", "RZ", "CNOT"}
