@@ -52,13 +52,11 @@ class QAOASolverBase(ABC):
             operators.append(operator)
 
         self.H_cost = qp.Hamiltonian(coeffs, operators)
-        if normalize:
-            coeffs = np.array(self.H_cost.coeffs, dtype=float)
-            max_coefficient = np.max(np.abs(coeffs))
-            if max_coefficient:
-                self.H_cost = qp.Hamiltonian(
-                    (coeffs / max_coefficient).tolist(), self.H_cost.ops
-                )
+if normalize and self.H_cost.coeffs:
+    coeffs = np.array(self.H_cost.coeffs, dtype=float)
+    max_coefficient = np.max(np.abs(coeffs))
+    if max_coefficient:
+        self.H_cost = qp.Hamiltonian((coeffs / max_coefficient).tolist(), self.H_cost.ops)
 
     def construct_mixer_hamiltonian(self, scaling=True):
         scale_factor = 1.0
