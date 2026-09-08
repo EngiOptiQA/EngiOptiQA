@@ -147,19 +147,27 @@ class QAOAParameterOptimizer:
     def _optimize_linear_ramp(self):
         params = np.array([1.0, 1.0], requires_grad=True)
 
+        p = self.num_layers
+        s = (np.arange(p) + 0.5) / p
+
         def objective(values):
+            betas = (1.0 - s) * values[0]
+            gammas = s * values[1]
+
             return self.objective_function(
-                np.linspace(1, 0, self.num_layers) * values[0],
-                np.linspace(0, 1, self.num_layers) * values[1],
+                betas,
+                gammas,
             )
 
         for iteration in range(self.optimization_iterations):
             params = self.optimizer.step(objective, params)
             self._print_status(iteration, objective(params))
-        return (
-            np.linspace(1, 0, self.num_layers) * params[0],
-            np.linspace(0, 1, self.num_layers) * params[1],
-        )
+
+        betas = (1.0 - s) * params[0]
+        gammas = s * params[1]
+
+        return betas, gammas
+
 
     def _print_status(self, iteration, objective_value):
         completed_iterations = iteration + 1
