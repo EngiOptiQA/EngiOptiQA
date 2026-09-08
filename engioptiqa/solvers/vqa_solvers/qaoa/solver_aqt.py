@@ -87,8 +87,8 @@ class QAOASolverAQT(QAOASolverBase):
             },
         )
 
-    def select_parameters(self):
-        return self.fixed_parameters()
+    def select_parameters(self, tau=None):
+        return self.fixed_parameters(tau=tau)
 
     def execute(self, problem, betas, gammas, shots):
         start_time = time.perf_counter()
@@ -96,11 +96,10 @@ class QAOASolverAQT(QAOASolverBase):
         print(f"Sampling completed in {time.perf_counter() - start_time:.3f} s")
         return self.store_sample_results(problem, counts, shots)
 
-    def solve_problem(self, problem, num_layers=1, shots=None):
+    def solve_problem(self, problem, num_layers=1, shots=None, tau=None):
         if shots is None or not isinstance(shots, int) or shots <= 0:
             raise ValueError("Number of shots must be a positive integer.")
 
         self.prepare_problem_and_ansatz(problem, num_layers)
-        self.setup_backend()
-        betas, gammas = self.select_parameters()
+        betas, gammas = self.select_parameters(tau=tau)
         return self.execute(problem, betas, gammas, shots)

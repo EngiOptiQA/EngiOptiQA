@@ -25,8 +25,8 @@ class QAOASolverBase(ABC):
         self.n_qubits = max(
             (max(term) for term in ising_poly_dict if term), default=-1
         ) + 1
-        self.construct_cost_hamiltonian(ising_poly_dict, normalize=True)
-        self.construct_mixer_hamiltonian(scaling=True)
+        self.construct_cost_hamiltonian(ising_poly_dict)
+        self.construct_mixer_hamiltonian()
         self.num_layers = num_layers
         self.ansatz = self.qaoa_ansatz
 
@@ -40,7 +40,7 @@ class QAOASolverBase(ABC):
                     ising_poly_dict[tuple(sorted(subset))] += binary_coeff * factor
         return ising_poly_dict
 
-    def construct_cost_hamiltonian(self, ising_poly_dict, normalize=True):
+    def construct_cost_hamiltonian(self, ising_poly_dict):
         ising_poly_dict.pop((), 0.0)
         coeffs = []
         operators = []
@@ -52,21 +52,21 @@ class QAOASolverBase(ABC):
             operators.append(operator)
 
         self.H_cost = qp.Hamiltonian(coeffs, operators)
-        if normalize and self.H_cost.coeffs:
+
+        self.cost_scale = 1.0
+        if self.H_cost.coeffs:
+            # Normalize the cost Hamiltonian coefficients to have a maximum absolute value of 1
             coeffs = np.array(self.H_cost.coeffs, dtype=float)
             max_coefficient = np.max(np.abs(coeffs))
             if max_coefficient:
-                self.H_cost = qp.Hamiltonian((coeffs / max_coefficient).tolist(), self.H_cost.ops)
+                self.cost_scale = max_coefficient
+                self.H_cost = qp.Hamiltonian((coeffs / self.cost_scale).tolist(), self.H_cost.ops)
 
-    def construct_mixer_hamiltonian(self, scaling=True):
-        scale_factor = 1.0
-        if scaling and self.H_cost.coeffs:
-            mean_coefficient = float(np.mean(np.abs(self.H_cost.coeffs)))
-            scale_factor = mean_coefficient if mean_coefficient and math.isfinite(mean_coefficient) else 1.0
-            self.H_mixer = qp.Hamiltonian(
-                [scale_factor] * self.n_qubits,
-                [qp.PauliX(qubit) for qubit in range(self.n_qubits)],
-            )
+    def construct_mixer_hamiltonian(self):
+        self.H_mixer = qp.Hamiltonian(
+            [1.0] * self.n_qubits,
+            [qp.PauliX(qubit) for qubit in range(self.n_qubits)],
+        )
 
     def qaoa_layer(self, beta, gamma):
         qaoa.cost_layer(gamma, self.H_cost)
@@ -77,11 +77,16 @@ class QAOASolverBase(ABC):
             qp.Hadamard(wires=wire)
         qp.layer(self.qaoa_layer, self.num_layers, betas, gammas)
 
-    def fixed_parameters(self):
-        return (
-            np.linspace(1, 0, self.num_layers),
-            np.linspace(0, 1, self.num_layers),
-        )
+    def fixed_parameters(self, tau=None):
+        p = self.num_layers
+        s = (np.arange(p) + 0.5) / p
+        if tau is None:
+            tau = p
+
+        gammas = (tau / p) * s
+        betas = (tau / p) * (1.0 - s)
+
+        return betas, gammas
 
     def store_sample_results(self, problem, counts, shots):
         results = []

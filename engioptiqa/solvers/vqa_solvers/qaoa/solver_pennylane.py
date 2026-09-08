@@ -57,9 +57,9 @@ class QAOASolverPennylane(QAOASolverBase):
     def objective_function(self, betas, gammas):
         return self.qaoa_expectation_circuit()(betas, gammas)
 
-    def select_parameters(self, mode, optimization_iterations):
+    def select_parameters(self, mode, optimization_iterations, tau=None):
         if mode == "fixed":
-            return self.fixed_parameters()
+            return self.fixed_parameters(tau=tau)
         elif mode in {"linear_ramp", "optimize"}:
             return QAOAParameterOptimizer(
                 self.objective_function,
@@ -98,7 +98,7 @@ class QAOASolverPennylane(QAOASolverBase):
         print(f"Sampling completed in {time.perf_counter() - start_time:.3f} s")
         return self.store_sample_results(problem, counts, shots)
 
-    def solve_problem(self, problem, num_layers=1, mode="fixed", device="lightning.qubit",
+    def solve_problem(self, problem, num_layers=1, mode="fixed", tau=None,device="lightning.qubit",
                       circuit="probs", shots=None, optimization_iterations=10):
         if circuit not in {"probs", "sample"}:
             raise ValueError(f"Unsupported circuit type: {circuit}")
@@ -111,7 +111,7 @@ class QAOASolverPennylane(QAOASolverBase):
 
         self.prepare_problem_and_ansatz(problem, num_layers)
         self.setup_device(device)
-        betas, gammas = self.select_parameters(mode, optimization_iterations)
+        betas, gammas = self.select_parameters(mode, optimization_iterations, tau=tau)
         return self.execute(
             problem, betas, gammas, circuit, shots
         )
