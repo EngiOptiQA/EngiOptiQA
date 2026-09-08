@@ -100,8 +100,8 @@ class QAOASolverPennylane(QAOASolverBase):
 
     def solve_problem(self, problem, num_layers=1, mode="fixed", device="lightning.qubit",
                       circuit="probs", shots=None, tau=None, optimization_iterations=10):
-        if num_layers <= 0:
-             raise ValueError("Number of layers must be a positive integer.")
+        if not isinstance(num_layers, (int, np.integer)) or num_layers <= 0:
+            raise ValueError("Number of layers must be a positive integer.")
         if circuit not in {"probs", "sample"}:
             raise ValueError(f"Unsupported circuit type: {circuit}")
         if circuit == "sample" and shots is None:
