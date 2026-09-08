@@ -13,14 +13,15 @@ class QAOASolverAQT(QAOASolverBase):
                  optimization_level=3, *args, **kwargs):
         super().__init__(token_file=token_file, proxy=proxy, *args, **kwargs)
         self.backend_noise = backend_noise
-        self.backend = backend
+        if backend is not None:
+            self.backend = backend
+        else:
+            self.setup_backend()
         if optimization_level not in range(4):
             raise ValueError("optimization_level must be an integer from 0 to 3.")
         self.optimization_level = optimization_level
 
     def setup_backend(self):
-        if self.backend is not None:
-            return
 
         try:
             from qiskit_aqt_provider import AQTProvider
@@ -55,13 +56,17 @@ class QAOASolverAQT(QAOASolverBase):
         from qiskit import QuantumCircuit
         from qiskit_aqt_provider.primitives import AQTSampler
 
-        circuit = QuantumCircuit.from_qasm_str(self.export_ansatz_qasm(betas, gammas))
+        self.transpiled = None
+        self.circuit = QuantumCircuit.from_qasm_str(self.export_ansatz_qasm(betas, gammas))
         print(f"Running circuit on AQT backend with {shots} shots...")
         sampler = AQTSampler(self.backend)
         sampler.set_transpile_options(optimization_level=self.optimization_level)
         quasi_dist = sampler.run(
-            circuits=[circuit], shots=shots
+            circuits=[self.circuit],
+            shots=shots,
         ).result().quasi_dists[0]
+        self.transpiled = sampler.transpiled_circuits[0]
+
         return self._quasi_dist_to_counts(quasi_dist, shots)
 
     def _quasi_dist_to_counts(self, quasi_dist, shots):
