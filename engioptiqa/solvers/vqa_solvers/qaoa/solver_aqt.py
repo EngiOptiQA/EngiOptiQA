@@ -102,6 +102,8 @@ class QAOASolverAQT(QAOASolverBase):
         return self.store_sample_results(problem, counts, shots)
 
     def solve_problem(self, problem, num_layers=1, shots=None, tau=None):
+        if num_layers <= 0:
+             raise ValueError("Number of layers must be a positive integer.")
         if shots is None or not isinstance(shots, int) or shots <= 0:
             raise ValueError("Number of shots must be a positive integer.")
 
