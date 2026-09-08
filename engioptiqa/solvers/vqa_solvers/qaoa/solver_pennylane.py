@@ -98,8 +98,10 @@ class QAOASolverPennylane(QAOASolverBase):
         print(f"Sampling completed in {time.perf_counter() - start_time:.3f} s")
         return self.store_sample_results(problem, counts, shots)
 
-    def solve_problem(self, problem, num_layers=1, mode="fixed", tau=None,device="lightning.qubit",
-                      circuit="probs", shots=None, optimization_iterations=10):
+    def solve_problem(self, problem, num_layers=1, mode="fixed", device="lightning.qubit",
+                      circuit="probs", shots=None, tau=None, optimization_iterations=10):
+        if num_layers <= 0:
+             raise ValueError("Number of layers must be a positive integer.")
         if circuit not in {"probs", "sample"}:
             raise ValueError(f"Unsupported circuit type: {circuit}")
         if circuit == "sample" and shots is None:
