@@ -313,7 +313,9 @@ class BaseProblemRod1D(Problem):
 
         self.binary_model = Model(self.poly)
 
-        output = f'Number of binary variables: {len(self.binary_model.get_variables())}\n'
+        n_problem_variables = len(self.binary_model.get_variables())
+        assert(self.get_number_of_problem_variables() == n_problem_variables)
+        output = f'Number of binary variables: {n_problem_variables}\n'
         self.print_and_log(output)
 
     def update_penalty_weight_in_problem_formulation(self, penalty_weight = 1.0):
