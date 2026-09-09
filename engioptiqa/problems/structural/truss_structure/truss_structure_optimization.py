@@ -12,14 +12,19 @@ class TrussStructureOptimization(TrussStructure):
         elif volume_constraint['mode'] == 'num_add_members':
             self.target_num_add_members = volume_constraint.get('target', None)
 
-    def get_number_of_problem_variables(self):
+    def get_initial_number_of_problem_variables(self):
         n_existent_members = self.get_number_of_existent_members()
         n_existent_optional_members = self.get_number_of_existent_optional_members()
         n_problem_variables = n_existent_members * self.n_qubits_per_var + n_existent_optional_members
         if self.volume_constraint['type'] == 'ineq':
             n_problem_variables += self.n_qubits_slack
         return n_problem_variables
-
+    
+    def get_number_of_problem_variables(self):
+        if not hasattr(self, 'n_problem_variables'):
+            raise Exception("Problem formulation has not been generated yet. Call generate_problem_formulation() first.")
+        return self.n_problem_variables
+    
     def generate_discretization(self,
                                 n_qubits_per_var, binary_representation_stress,
                                 lower_lim_stress=None, upper_lim_stress=None,
@@ -118,7 +123,7 @@ class TrussStructureOptimization(TrussStructure):
         )
 
         self.binary_model = Model(self.poly)
-
+        self.n_problem_variables = len(self.binary_model.get_variables())
         output = f'Number of binary variables: {len(self.binary_model.get_variables())}\n'
         self.print_and_log(output)
 
@@ -132,7 +137,7 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
     def __init__(self, volume_constraint={}, output_path=None):
         super().__init__(volume_constraint=volume_constraint, output_path=output_path)
 
-    def get_number_of_problem_variables(self):
+    def get_initial_number_of_problem_variables(self):
         n_existent_members = self.get_number_of_existent_members()
         n_existent_optional_members = self.get_number_of_existent_optional_members()
         n_problem_variables = n_existent_members * self.n_qubits_per_var \
@@ -140,6 +145,12 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
         if self.volume_constraint['type'] == 'ineq':
             n_problem_variables += self.n_qubits_slack
         return n_problem_variables
+    
+
+    def get_number_of_problem_variables(self):
+        if not hasattr(self, 'n_problem_variables'):
+            raise Exception("Problem formulation has not been generated yet. Call generate_problem_formulation() first.")
+        return self.n_problem_variables
 
     def generate_discretization(self,
                                 n_qubits_per_var, binary_representation_stress,

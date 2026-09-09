@@ -13,8 +13,9 @@ class StructuralAnalysisProblemRod1D(BaseProblemRod1D):
     def get_analytical_cross_sections(self):
         return np.ones(self.rod.n_comp)*self.rod.A
 
-    def get_number_of_problem_variables(self):
+    def get_initial_number_of_problem_variables(self):
         return self.rod.n_comp * self.n_qubits_per_var
+        
 
     def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
         BaseProblemRod1D.initialize_discretization(self)
