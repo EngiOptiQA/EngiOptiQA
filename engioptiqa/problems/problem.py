@@ -72,7 +72,12 @@ class Problem(ABC):
     # -----------------------------------------------------
     def has_adaptive_variables(self):
         return False
-
+    
+    def get_number_of_problem_variables(self):
+        if not hasattr(self, 'n_problem_variables'):
+            raise RuntimeError("Problem formulation has not been generated yet. Call generate_problem_formulation() first.")
+        return self.n_problem_variables
+            
     def get_number_of_adaptive_vars(self):
         return 0
 
