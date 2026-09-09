@@ -15,7 +15,7 @@ class TrussStructureOptimization(TrussStructure):
     def get_number_of_problem_variables(self):
         n_existent_members = self.get_number_of_existent_members()
         n_existent_optional_members = self.get_number_of_existent_optional_members()
-        n_problem_variables = n_existent_members * self.n_qubits_per_var + n_existent_optional_members * self.n_qubits_per_area
+        n_problem_variables = n_existent_members * self.n_qubits_per_var + n_existent_optional_members
         if self.volume_constraint['type'] == 'ineq':
             n_problem_variables += self.n_qubits_slack
         return n_problem_variables
