@@ -169,11 +169,6 @@ class BaseProblemRod1D(Problem):
     def get_range_limits(self, i_group):
         assert(i_group == 0)
         return self.a_min, self.a_max
-    
-    def get_number_of_problem_variables(self):
-            if not hasattr(self, 'n_problem_variables'):
-                raise Exception("Problem formulation has not been generated yet. Call generate_problem_formulation() first.")
-            return self.n_problem_variables
 
     def update_formulation(self, best_solution):
         self.update_nodal_force_polys()
