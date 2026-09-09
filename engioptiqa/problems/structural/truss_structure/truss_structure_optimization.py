@@ -146,12 +146,6 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
             n_problem_variables += self.n_qubits_slack
         return n_problem_variables
     
-
-    def get_number_of_problem_variables(self):
-        if not hasattr(self, 'n_problem_variables'):
-            raise Exception("Problem formulation has not been generated yet. Call generate_problem_formulation() first.")
-        return self.n_problem_variables
-
     def generate_discretization(self,
                                 n_qubits_per_var, binary_representation_stress,
                                 n_qubits_per_area, binary_representation_area,
