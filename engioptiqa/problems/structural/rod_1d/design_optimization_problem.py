@@ -51,7 +51,7 @@ class DesignOptimizationProblemRod1D(BaseProblemRod1D):
             output += f"Design (Analytical) = {list(self.A_analytic)}\n"
         return output
 
-    def get_number_of_problem_variables(self):
+    def get_initial_number_of_problem_variables(self):
         return self.rod.n_comp * (1 + self.n_qubits_per_var)
 
     def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
