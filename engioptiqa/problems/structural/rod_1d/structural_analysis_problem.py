@@ -16,7 +16,6 @@ class StructuralAnalysisProblemRod1D(BaseProblemRod1D):
     def get_initial_number_of_problem_variables(self):
         return self.rod.n_comp * self.n_qubits_per_var
 
-
     def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
         BaseProblemRod1D.initialize_discretization(self)
         BaseProblemRod1D.generate_nodal_force_polys(self, n_qubits_per_var, binary_representation, lower_lim, upper_lim)
