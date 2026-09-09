@@ -19,7 +19,7 @@ class TrussStructureOptimization(TrussStructure):
         if self.volume_constraint['type'] == 'ineq':
             n_problem_variables += self.n_qubits_slack
         return n_problem_variables
-    
+
     def generate_discretization(self,
                                 n_qubits_per_var, binary_representation_stress,
                                 lower_lim_stress=None, upper_lim_stress=None,
@@ -140,7 +140,7 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
         if self.volume_constraint['type'] == 'ineq':
             n_problem_variables += self.n_qubits_slack
         return n_problem_variables
-    
+
     def generate_discretization(self,
                                 n_qubits_per_var, binary_representation_stress,
                                 n_qubits_per_area, binary_representation_area,
