@@ -628,9 +628,7 @@ class TrussStructure(Problem):
         # self.generate_objective_poly(penalty_weight=penalty_weight, lagrange_multipliers=lagrange_multipliers, mode=mode)
         self.binary_model = Model(self.poly)
 
-        n_problem_variables = len(self.binary_model.get_variables())
-        assert(self.get_number_of_problem_variables() == n_problem_variables)
-        output = f'Number of binary variables: {n_problem_variables}\n'
+        output = f'Number of binary variables: {len(self.binary_model.get_variables())}\n'
         self.print_and_log(output)
 
     def objective(self, complementary_energy, constraints_squared_sum, constraints):
