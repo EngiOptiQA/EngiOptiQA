@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "engioptiqa"
-description = "Engineering Optimization with Quantum Annealing"
+description = "Engineering Optimization with Quantum Algorithms"
 readme = "README.md"
 authors = [
     {name = "Fabian Key", email = "fabian.key@tuwien.ac.at"}
