@@ -224,6 +224,13 @@ class TrussStructure(Problem):
                 n_existent_members += 1
         return n_existent_members
 
+    def get_number_of_existent_optional_members(self):
+        n_existent_optional_members = 0
+        for member in self.optional_members:
+            if member.exists:
+                n_existent_optional_members += 1
+        return n_existent_optional_members
+
     def visualize(self, subtitle='', interactive=False):
         """
         Visualize the truss structure, including nodes, members, loads, and supports.

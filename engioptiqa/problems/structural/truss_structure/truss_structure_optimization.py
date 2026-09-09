@@ -14,7 +14,8 @@ class TrussStructureOptimization(TrussStructure):
 
     def get_number_of_problem_variables(self):
         n_existent_members = self.get_number_of_existent_members()
-        n_problem_variables = n_existent_members * (1 + self.n_qubits_per_var)
+        n_existent_optional_members = self.get_number_of_existent_optional_members()
+        n_problem_variables = n_existent_members * self.n_qubits_per_var + n_existent_optional_members * self.n_qubits_per_area
         if self.volume_constraint['type'] == 'ineq':
             n_problem_variables += self.n_qubits_slack
         return n_problem_variables
@@ -121,6 +122,7 @@ class TrussStructureOptimization(TrussStructure):
         n_problem_variables = len(self.binary_model.get_variables())
         assert(self.get_number_of_problem_variables() == n_problem_variables)
         output = f'Number of binary variables: {n_problem_variables}\n'
+        self.print_and_log(output)
 
     def update_formulation(self, best_solution=None):
         self.update_member_stress_polys()
@@ -134,7 +136,9 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
 
     def get_number_of_problem_variables(self):
         n_existent_members = self.get_number_of_existent_members()
-        n_problem_variables = n_existent_members * (self.n_qubits_per_var + self.n_qubits_per_area)
+        n_existent_optional_members = self.get_number_of_existent_optional_members()
+        n_problem_variables = n_existent_members * self.n_qubits_per_var \
+            + n_existent_optional_members * self.n_qubits_per_area
         if self.volume_constraint['type'] == 'ineq':
             n_problem_variables += self.n_qubits_slack
         return n_problem_variables
