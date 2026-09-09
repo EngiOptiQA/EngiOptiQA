@@ -120,7 +120,8 @@ class TrussStructureOptimization(TrussStructure):
         self.binary_model = Model(self.poly)
 
         n_problem_variables = len(self.binary_model.get_variables())
-        assert(self.get_number_of_problem_variables() == n_problem_variables)
+        if self.get_number_of_problem_variables() != n_problem_variables:
+            raise Exception(f"Mismatch in number of problem variables: expected {self.get_number_of_problem_variables()}, got {n_problem_variables}")
         output = f'Number of binary variables: {n_problem_variables}\n'
         self.print_and_log(output)
 
