@@ -213,10 +213,6 @@ class TrussStructure(Problem):
             'degree': degree,
         }
 
-    def get_number_of_problem_variables(self):
-        n_existent_members = self.get_number_of_existent_members()
-        return n_existent_members * self.n_qubits_per_var
-
     def get_number_of_existent_members(self):
         n_existent_members = 0
         for member in self.members:
