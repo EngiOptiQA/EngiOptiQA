@@ -2,13 +2,13 @@
 [![Test Examples](https://github.com/EngiOptiQA/EngiOptiQA/actions/workflows/test_examples.yml/badge.svg)](https://github.com/EngiOptiQA/EngiOptiQA/actions/workflows/test_examples.yml)
 [![PyPI - Version](https://img.shields.io/pypi/v/engioptiqa)](https://pypi.org/project/engioptiqa/)
 
-# EngiOptiQA: Engineering Optimization with Quantum Annealing
+# EngiOptiQA: Engineering Optimization with Quantum Algorithms
 
 **Please note:** _EngiOptiQA_ is currently in a very early stage of development. As the project progresses, documentation, additional features, and enhancements will be added.
 
 ## Overview
-_EngiOptiQA_ is a Python software library dedicated to **Engi**neering **Opti**mization with **Q**uantum **A**nnealing (QA).
-This project provides a set of tools to formulate engineering optimization problems suitable for QA.
+_EngiOptiQA_ is a Python software library dedicated to **Engi**neering **Opti**mization with **Q**uantum **A**lgorithms.
+This project provides a set of tools to formulate engineering optimization problems suitable for quantum algorithms, including quantum annealing (QA) and variational quantum algorithms (VQAs) such as the quantum approximate optimization algorithm (QAOA).
 
 A minimal documentation can be found under [https://engioptiqa.github.io/EngiOptiQA/](https://engioptiqa.github.io/EngiOptiQA/). To learn more about the background of _EngiOptiQA_ and the implemented problem formulations, please refer to the corresponding publication [[1]](#pub1).
 
@@ -25,10 +25,11 @@ pip install -r requirements.txt
 python3 examples/structural/rod_1d/design_optimization_sa.py
 ```
 
-The expected $H_1$ error for the best solution is approximately $1.59 \times 10^{-2}$:
+The expected relative $H_1$ error for the force function of the best solution is approximately $1.59 \times 10^{-2}$:
 
 ```bash
-H1 Error 0.015873015873015817 0.015873015873015817
+Force:
+   Rel. H1 error 1.5873e-02
 ```
 
 ## Funding

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "engioptiqa"
-description = "Engineering Optimization with Quantum Annealing"
+description = "Engineering Optimization with Quantum Algorithms"
 readme = "README.md"
 authors = [
     {name = "Fabian Key", email = "fabian.key@tuwien.ac.at"}
@@ -19,10 +19,24 @@ dependencies = [
     "matplot2tikz~=0.5",
     "matplotlib~=3.10",
     "numpy~=2.0",
+    "openjij~=0.11",
+    "pennylane~=0.44",
+    "pennylane-lightning",
     "prettytable~=3.17",
     "sympy~=1.14"
 ]
 dynamic = ["version"]
+
+[project.optional-dependencies]
+# Only required for QAOASolverPennylane's 'MQSSPennylaneDevice' device, i.e. LRZ's Munich Quantum Software Stack.
+mqss = [
+    "mqss-pennylane-adapter",
+    "qiskit<2"
+]
+# Only required for QAOASolverAQT, i.e. AQT's offline simulator via qiskit-aqt-provider.
+aqt = [
+    "qiskit-aqt-provider"
+]
 
 [tool.setuptools_scm]
 version_scheme = "post-release"

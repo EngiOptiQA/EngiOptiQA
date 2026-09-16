@@ -4,15 +4,38 @@ from engioptiqa.variables.real_number import RealNumber
 from .truss_structure import TrussStructure
 
 class TrussStructureOptimization(TrussStructure):
-    def __init__(self, target_volume=None, volume_constraint='equality', output_path=None):
+    def __init__(self, volume_constraint = {}, output_path=None):
         super().__init__(output_path)
-        self.target_volume = target_volume
         self.volume_constraint = volume_constraint
+        if volume_constraint['mode'] == 'direct':
+             self.target_volume = volume_constraint.get('target', None)
+        elif volume_constraint['mode'] == 'num_add_members':
+            self.target_num_add_members = volume_constraint.get('target', None)
+
+    def get_initial_number_of_problem_variables(self):
+        n_existent_members = self.get_number_of_existent_members()
+        n_existent_optional_members = self.get_number_of_existent_optional_members()
+        n_problem_variables = n_existent_members * self.n_qubits_per_var + n_existent_optional_members
+        if self.volume_constraint['type'] == 'ineq':
+            n_problem_variables += self.n_qubits_slack
+        return n_problem_variables
+
+    def generate_discretization(self,
+                                n_qubits_per_var, binary_representation_stress,
+                                lower_lim_stress=None, upper_lim_stress=None,
+                                n_qubits_slack=3):
+        self.initialize_discretization()
+        self.generate_member_stress_polys(n_qubits_per_var, binary_representation_stress, lower_lim_stress, upper_lim_stress)
+        self.generate_member_area_polys()
+        if self.volume_constraint['type'] == 'ineq':
+            self.n_qubits_slack = n_qubits_slack
+            self.generate_slack_variable()
 
     def generate_member_area_polys(self):
         assert(self.variable_generator is not None)
         member_area_polys = []
         member_areas = self.get_member_areas()
+        member_indicators = []
 
         q = self.variable_generator.array("Binary", self.n_optional_members , name=f"q_A")
         i_optional_member = 0
@@ -20,36 +43,55 @@ class TrussStructureOptimization(TrussStructure):
             A = member_areas[i_member]
             if self.members[i_member] in self.optional_members:
                 member_area_polys.append(A*q[i_optional_member])
+                member_indicators.append(q[i_optional_member])
                 i_optional_member += 1
             else:
                 member_area_polys.append(A)
 
         self.member_area_polys = member_area_polys
+        self.member_indicators = member_indicators
 
     def set_target_volume(self, target_volume):
         self.target_volume = target_volume
 
-    def generate_slack_variable(self, n_qubits_slack=3):
+    def set_target_num_add_members(self, target_num_add_members):
+        self.target_num_add_members = target_num_add_members
+
+    def generate_slack_variable(self):
         assert(self.variable_generator is not None)
-        q = self.variable_generator.array("Binary", n_qubits_slack , name=f"s_vol")
-        s = RealNumber(n_qubits_slack, 'normalized')
+        q = self.variable_generator.array("Binary", self.n_qubits_slack , name=f"s_vol")
+        s = RealNumber(self.n_qubits_slack, 'normalized')
         self.slack_variable = s.evaluate(q)
 
     def generate_volume_constraint_poly(self):
 
-        member_areas = self.member_area_polys
-        if self.target_volume is not None and self.target_volume > 0.:
-            con_volume = (self.total_volume(member_areas)-self.target_volume)/self.target_volume
-            if self.volume_constraint == 'equality':
-                self.volume_con_poly = [con_volume]
-                self.volume_con_squared_poly = con_volume**2
-            elif self.volume_constraint == 'inequality':
-                s = self.slack_variable
-                volume_ratio = self.total_volume(member_areas)/self.target_volume
-                self.volume_con_poly = [volume_ratio+s-1.]
-                self.volume_con_squared_poly = (volume_ratio+s-1.)**2
-        else:
-            raise Exception("Target volume must be set and be greater than zero.")
+        if self.volume_constraint['mode'] == 'direct':
+            member_areas = self.member_area_polys
+            if self.target_volume is not None and self.target_volume > 0.:
+                if self.volume_constraint['type'] == 'eq':
+                    res_volume = (self.total_volume(member_areas)-self.target_volume)/self.target_volume
+                    self.volume_con_poly = [res_volume]
+                    self.volume_con_squared_poly = res_volume**2
+                elif self.volume_constraint['type'] == 'ineq':
+                    s = self.slack_variable
+                    volume_ratio = self.total_volume(member_areas)/self.target_volume
+                    self.volume_con_poly = [volume_ratio+s-1.]
+                    self.volume_con_squared_poly = (volume_ratio+s-1.)**2
+            else:
+                raise Exception("Target volume must be set and be greater than zero.")
+        elif self.volume_constraint['mode'] == 'num_add_members':
+            if self.target_num_add_members is not None and self.target_num_add_members > 0:
+                if self.volume_constraint['type'] == 'eq':
+                    res_target_members = (sum(self.member_indicators)-self.target_num_add_members)/self.target_num_add_members
+                    self.volume_con_poly = [res_target_members]
+                    self.volume_con_squared_poly = res_target_members**2
+                elif self.volume_constraint['type'] == 'ineq':
+                    s = self.slack_variable
+                    con_target_members = (sum(self.member_indicators)/self.target_num_add_members+s-1.)
+                    self.volume_con_poly = [con_target_members]
+                    self.volume_con_squared_poly = con_target_members**2
+            else:
+                raise Exception("Number of additional members must be set and be greater than zero.")
 
 
     def generate_constraint_polys(self):
@@ -64,23 +106,52 @@ class TrussStructureOptimization(TrussStructure):
     def generate_problem_formulation(self, penalty_weight=1.0, lagrange_multipliers=[], mode='penalty'):
         super().generate_complementary_energy_poly()
         self.generate_constraint_polys()
-        super().generate_objective_poly(penalty_weight=penalty_weight, lagrange_multipliers=lagrange_multipliers, mode=mode)
+
+        self.constrained_opt_mode = mode
+        self.penalty_weight = penalty_weight
+        self.lagrange_multipliers = lagrange_multipliers
+
+        self.poly = super().objective(
+            self.complementary_energy_poly,
+            self.constraints_sum_squared_poly,
+            self.constraint_polys
+        )
 
         self.binary_model = Model(self.poly)
+        self.n_problem_variables = len(self.binary_model.get_variables())
+        output = f'Number of binary variables: {len(self.binary_model.get_variables())}\n'
+        self.print_and_log(output)
+
+    def update_formulation(self, best_solution=None):
+        self.update_member_stress_polys()
+        self.generate_member_area_polys()
+        if self.volume_constraint['type'] == 'ineq':
+            self.generate_slack_variable()
 
 class TrussStructureOptimizationContinuous(TrussStructureOptimization):
-    def __init__(self, target_volume=None, volume_constraint='equality', output_path=None):
-        super().__init__(target_volume=target_volume, volume_constraint=volume_constraint, output_path=output_path)
+    def __init__(self, volume_constraint={}, output_path=None):
+        super().__init__(volume_constraint=volume_constraint, output_path=output_path)
+
+    def get_initial_number_of_problem_variables(self):
+        n_existent_members = self.get_number_of_existent_members()
+        n_existent_optional_members = self.get_number_of_existent_optional_members()
+        n_problem_variables = n_existent_members * self.n_qubits_per_var \
+            + n_existent_optional_members * self.n_qubits_per_area
+        if self.volume_constraint['type'] == 'ineq':
+            n_problem_variables += self.n_qubits_slack
+        return n_problem_variables
 
     def generate_discretization(self,
                                 n_qubits_per_var, binary_representation_stress,
                                 n_qubits_per_area, binary_representation_area,
                                 lower_lim_stress=None, upper_lim_stress=None,
-                                lower_lim_area=None, upper_lim_area=None):
+                                lower_lim_area=None, upper_lim_area=None,
+                                n_qubits_slack=3):
         self.initialize_discretization()
         self.generate_member_stress_polys(n_qubits_per_var, binary_representation_stress, lower_lim_stress, upper_lim_stress)
         self.generate_member_area_polys(n_qubits_per_area, binary_representation_area, lower_lim_area, upper_lim_area)
-        if self.volume_constraint == 'inequality':
+        if self.volume_constraint['type'] == 'ineq':
+            self.n_qubits_slack = n_qubits_slack
             self.generate_slack_variable()
 
     def has_adaptive_variables(self):
@@ -147,7 +218,7 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
     def update_formulation(self, best_solution):
         self.update_member_stress_polys()
         self.update_member_area_polys(best_solution)
-        if self.volume_constraint == 'inequality':
+        if self.volume_constraint['type'] == 'ineq':
             self.generate_slack_variable()
 
     def generate_member_area_polys(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
@@ -163,8 +234,8 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
 
         member_area_polys = []
         member_areas = self.get_member_areas()
+        i_optional_member = 0
         for i_member, _ in enumerate(self.members):
-            i_optional_member = 0
             if self.members[i_member] in self.optional_members:
                 q = self.variable_generator.array("Binary", self.n_qubits_per_area, name=f"q_A_{i_optional_member}")
                 member_area_polys.append(self.real_number_areas.evaluate(q))
