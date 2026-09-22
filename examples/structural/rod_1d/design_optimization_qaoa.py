@@ -1,17 +1,20 @@
 import sys
 from datetime import datetime
-import numpy as np
 from pathlib import Path
 
 # Make sure the repo root is on the path
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-from engioptiqa import AnnealingSolverDWave, DesignOptimizationProblemRod1D, Rod1D
+from engioptiqa import (
+    QAOASolverPennylane,
+    DesignOptimizationProblemRod1D,
+    Rod1D,
+)
 
 # Get the directory containing this script
 script_directory = Path(__file__).resolve().parent
 
 # Create an output folder with a timestamp
-results_root = script_directory / "results" / "design_optimization_sa"
+results_root = script_directory / "results" / "design_optimization_qaoa"
 output_path = results_root / datetime.now().strftime("%Y_%m_%d_%H-%M-%S")
 output_path.mkdir(parents=True, exist_ok=True)
 print(f"Created output folder: {output_path}")
@@ -33,10 +36,11 @@ optimization_problem.compute_analytical_solution()
 # Numerical Solution
 # ==================
 
-# Simulated Annealing Solver from D-Wave
-# --------------------------------------
-annealing_solver_sa = AnnealingSolverDWave()
-annealing_solver_sa.setup_solver(solver_type='simulated_annealing')
+# QAOA Solver based on PennyLane
+# -------------------------------
+qaoa_solver = QAOASolverPennylane()
+p = 5
+shots = 500
 
 # Discretization through Binary Representation of Real-Valued Nodal Coefficients and Cross Section Choice
 # -------------------------------------------------------------------------------------------------------
@@ -50,16 +54,14 @@ optimization_problem.generate_discretization(n_qubits_per_var, binary_representa
 penalty_weight = 7.5e2
 optimization_problem.generate_problem_formulation(penalty_weight=penalty_weight)
 
-# Transform Amplify Problem for D-Wave Solver
-# -------------------------------------------
-optimization_problem.transform_to_dwave()
-
-# Solve QUBO Problem by Simulated Annealing
-# -----------------------------------------
-annealing_solver_sa.solve_problem(
-    optimization_problem,
-    num_reads=200,
-    )
+probs = qaoa_solver.solve_problem(
+                optimization_problem,
+                num_layers=p,
+                mode="fixed",
+                device="lightning.qubit",
+                circuit="sample",
+                shots=shots,
+            )
 
 # Get the Best Solution, i.e., with Minimum Objective Value
 # =========================================================
@@ -70,11 +72,8 @@ best_solution = optimization_problem.get_best_solution()
 optimization_problem.plot_force(
     optimization_problem.force_analytic,
     best_solution['force'],
-    subtitle='Simulated Annealing',
-    file_name= str(output_path / "force_sa"),
+    subtitle='QAOA',
+    file_name= str(output_path / "force_qaoa"),
     save_fig = True,
     save_tikz = True
 )
-
-
-

@@ -80,11 +80,7 @@ annealing_solver_sa.solve_problem(ts, num_reads=50)
 
 # Analyze Solution
 # ================
-solutions_sa = ts.analyze_results(result_max=0)
-objectives = [s["objective"] for s in solutions_sa]
-i_best = int(np.argmin(objectives))
-best_solution = solutions_sa[i_best]
-
+best_solution = ts.get_best_solution()
 rel_error_forces, _, rel_error_compliance = ts.compare_with_reference_solution(best_solution)
 
 print('Compliance:')

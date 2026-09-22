@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
 import sys
+from types import SimpleNamespace
 
 from engioptiqa.problems import Problem
 from engioptiqa.variables.real_number import RealNumber
@@ -83,6 +84,10 @@ class TrussStructure(Problem):
 
         for i, member in enumerate(self.members):
             member.A = member_areas[i]
+            if abs(member_areas[i]) < 1e-12:
+                member.exists = False
+            else:
+                member.exists = True
 
     def get_member_areas(self):
         """
@@ -180,8 +185,9 @@ class TrussStructure(Problem):
         :return: Dictionary with information about the truss's determinacy.
         """
 
-        m = self.n_members # Number of members
-        j = len(self.nodes) # Number of joints (nodes)
+        members, nodes = self.get_existent_members_and_involved_nodes()
+        m = len(members) # Number of existent members
+        j = len(nodes)   # Number of joints connected to existent members
         # Reaction count: sum of fixed directions over supports
         r = 0
         for _, (xf, yf) in self.supports.items():
@@ -214,6 +220,13 @@ class TrussStructure(Problem):
                 n_existent_members += 1
         return n_existent_members
 
+    def get_number_of_existent_optional_members(self):
+        n_existent_optional_members = 0
+        for member in self.optional_members:
+            if member.exists:
+                n_existent_optional_members += 1
+        return n_existent_optional_members
+
     def visualize(self, subtitle='', interactive=False):
         """
         Visualize the truss structure, including nodes, members, loads, and supports.
@@ -237,7 +250,7 @@ class TrussStructure(Problem):
             ax.text(x - 0.05*dx_dy_mean, y - 0.05*dx_dy_mean, f"{node_id}", fontsize=12, zorder=3)
 
         # Plot members
-        A_max = max([member.A for member in self.members if member.exists]) if any(member.A > 0. for member in self.members) else 1.0
+        A_max = max([member.A for member in self.members if member.exists]) if any(member.exists for member in self.members) else 1.0
 
         for i_member, member in enumerate(self.members):
             if member.exists:
@@ -300,7 +313,7 @@ class TrussStructure(Problem):
         involved_nodes = []
 
         for i_member, member in enumerate(self.members):
-            if member.A > 0.:
+            if member.exists:
                 existent_members[i_member] = member
                 node_id_0 = member.node_id_0
                 node_id_1 = member.node_id_1
@@ -340,33 +353,32 @@ class TrussStructure(Problem):
 
         # Assemble global stiffness matrix
         for member in members.values():
-            if member.A > 0.:
-                node_id_0 = member.node_id_0
-                node_id_1 = member.node_id_1
-                # Get direction cosines
-                l, m = member.direction_cosines_0
-                L = member.length
+            node_id_0 = member.node_id_0
+            node_id_1 = member.node_id_1
+            # Get direction cosines
+            l, m = member.direction_cosines_0
+            L = member.length
 
-                # Get indices for the nodes
-                index_0_x = 2 * node_index_map[node_id_0]
-                index_0_y = index_0_x + 1
-                index_1_x = 2 * node_index_map[node_id_1]
-                index_1_y = index_1_x + 1
+            # Get indices for the nodes
+            index_0_x = 2 * node_index_map[node_id_0]
+            index_0_y = index_0_x + 1
+            index_1_x = 2 * node_index_map[node_id_1]
+            index_1_y = index_1_x + 1
 
-                # Stiffness matrix for the member
-                k = member.E * member.A / L
-                member_matrix = k * np.array([
-                    [l**2, l*m, -l**2, -l*m],
-                    [l*m, m**2, -l*m, -m**2],
-                    [-l**2, -l*m, l**2, l*m],
-                    [-l*m, -m**2, l*m, m**2]
-                ])
+            # Stiffness matrix for the member
+            k = member.E * member.A / L
+            member_matrix = k * np.array([
+                [l**2, l*m, -l**2, -l*m],
+                [l*m, m**2, -l*m, -m**2],
+                [-l**2, -l*m, l**2, l*m],
+                [-l*m, -m**2, l*m, m**2]
+            ])
 
-                # Add member stiffness matrix to global stiffness matrix
-                global_matrix[index_0_x:index_0_y+1, index_0_x:index_0_y+1] += member_matrix[:2, :2]
-                global_matrix[index_0_x:index_0_y+1, index_1_x:index_1_y+1] += member_matrix[:2, 2:]
-                global_matrix[index_1_x:index_1_y+1, index_0_x:index_0_y+1] += member_matrix[2:, :2]
-                global_matrix[index_1_x:index_1_y+1, index_1_x:index_1_y+1] += member_matrix[2:, 2:]
+            # Add member stiffness matrix to global stiffness matrix
+            global_matrix[index_0_x:index_0_y+1, index_0_x:index_0_y+1] += member_matrix[:2, :2]
+            global_matrix[index_0_x:index_0_y+1, index_1_x:index_1_y+1] += member_matrix[:2, 2:]
+            global_matrix[index_1_x:index_1_y+1, index_0_x:index_0_y+1] += member_matrix[2:, :2]
+            global_matrix[index_1_x:index_1_y+1, index_1_x:index_1_y+1] += member_matrix[2:, 2:]
 
         # Apply support conditions
         for node_id, (x_fixed, y_fixed) in self.supports.items():
@@ -450,7 +462,7 @@ class TrussStructure(Problem):
         else:
             return None, None
 
-    def update_formulation(self, solution_bit_array):
+    def update_formulation(self, best_solution=None):
         self.update_member_stress_polys()
         self.generate_member_area_polys()
 
@@ -598,25 +610,99 @@ class TrussStructure(Problem):
     def generate_problem_formulation(self, penalty_weight=1.0, lagrange_multipliers=[], mode='penalty'):
         self.generate_complementary_energy_poly()
         self.generate_constraint_polys()
-        self.generate_objective_poly(penalty_weight=penalty_weight, lagrange_multipliers=lagrange_multipliers, mode=mode)
+
+        self.constrained_opt_mode = mode
+        self.penalty_weight = penalty_weight
+        self.lagrange_multipliers = lagrange_multipliers
+
+        self.poly = self.objective(
+            self.complementary_energy_poly,
+            self.constraints_sum_squared_poly,
+            self.constraint_polys
+        )
+
+        # self.generate_objective_poly(penalty_weight=penalty_weight, lagrange_multipliers=lagrange_multipliers, mode=mode)
         self.binary_model = Model(self.poly)
 
-    def generate_objective_poly(self,penalty_weight=1.0, lagrange_multipliers=[], mode='penalty'):
-        if mode == 'penalty' or mode == 'augmented_lagrangian':
-            self.penalty_weight = penalty_weight
-            print(f"Penalty weight: {self.penalty_weight}\n")
-            self.poly = self.complementary_energy_poly + \
-                self.penalty_weight * self.constraints_sum_squared_poly
-            if mode == 'augmented_lagrangian':
+        output = f'Number of binary variables: {len(self.binary_model.get_variables())}\n'
+        self.print_and_log(output)
+
+    def objective(self, complementary_energy, constraints_squared_sum, constraints):
+        if  self.constrained_opt_mode == 'penalty' or  self.constrained_opt_mode == 'augmented_lagrangian':
+            obj = complementary_energy + self.penalty_weight * constraints_squared_sum
+            if self.constrained_opt_mode == 'augmented_lagrangian':
                 n_constraints = self.get_n_constraints()
-                if len(lagrange_multipliers) != (n_constraints):
+                if len(self.lagrange_multipliers) != (n_constraints):
                     raise Exception('Number of Lagrange multipliers must be equal to number of constraints' \
                                     f'({n_constraints}).')
-                for i, lagrange_multiplier in enumerate(lagrange_multipliers):
-                    self.poly -= lagrange_multiplier * self.constraint_polys[i]
+                for i, lagrange_multiplier in enumerate(self.lagrange_multipliers):
+                    obj -= lagrange_multiplier * constraints[i]
+            return obj
         else:
-            raise Exception(f'Unknown mode ({mode}) for problem formulation.')
-    def analyze_results(self, results=None, analysis_plots=True, compute_errors=True, result_max=sys.maxsize):
+            raise Exception(f'Unknown mode ({self.constrained_opt_mode}) to compute objective.')
+
+    def evaluate_result(self, result):
+
+        # Decode solution, i.e., evaluate nodal stress and member areas.
+        member_stresses_sol = self.decode_member_stress_solution(result)
+        member_areas_sol = self.decode_member_area_solution(result)
+        # Compute member forces, complementary energy, and volume.
+        member_forces_sol = [member_stresses_sol[i]*member_areas_sol[i] for i in range(len(member_stresses_sol))]
+        complementary_energy_sol = self.complementary_energy(member_stresses_sol, member_areas_sol)
+        volume_sol = self.total_volume(member_areas_sol)
+        # Evaluate constraints (joint residuals and volume constraint, if any).
+        joint_residuals_x_sol,  joint_residuals_y_sol, joint_residuals_squared_sum_sol = self.joint_residuals_squared_sum(member_stresses_sol, member_areas_sol)
+        joint_residuals_sol = joint_residuals_x_sol + joint_residuals_y_sol
+        constraints_sol = joint_residuals_sol
+        volume_residual_sol= 0.0
+        if hasattr(self, 'volume_constraint'):
+            if self.volume_constraint['mode'] == 'direct':
+                if self.volume_constraint['type'] == 'eq':
+                    volume_residual_sol = (volume_sol-self.target_volume)/self.target_volume
+                elif self.volume_constraint['type'] == 'ineq':
+                    volume_residual_sol = max(0.0, (volume_sol-self.target_volume)/self.target_volume)
+            elif self.volume_constraint['mode'] == 'num_add_members':
+                num_add_members = 0
+                for i_member, member in enumerate(self.members):
+                    if member in self.optional_members and member_areas_sol[i_member] > 0.:
+                        num_add_members += 1
+                if self.volume_constraint['type'] == 'eq':
+                    res_max_members = (num_add_members-self.target_num_add_members)/self.target_num_add_members
+                    volume_residual_sol = res_max_members
+                elif self.volume_constraint['type'] == 'ineq':
+                    res_max_members = max(0.0, (num_add_members-self.target_num_add_members)/self.target_num_add_members)
+                    volume_residual_sol = res_max_members
+            constraints_sol.extend([volume_residual_sol])
+        volume_residual_squared_sol = volume_residual_sol**2
+        constraints_squared_sum_sol = joint_residuals_squared_sum_sol + volume_residual_squared_sol
+        # Compute objective function.
+        objective_sol = self.objective(complementary_energy_sol, constraints_squared_sum_sol, constraints_sol)
+
+        solution = {
+            'member_forces': member_forces_sol,
+            'member_stresses': member_stresses_sol,
+            'member_areas': member_areas_sol,
+            'adaptive_vars': self.get_adaptive_vars(member_stresses_sol, member_areas_sol),
+            'complementary_energy': complementary_energy_sol,
+            'volume': volume_sol,
+            'volume_residual_squared': volume_residual_squared_sol,
+            'joint_residuals_squared_sum': joint_residuals_squared_sum_sol,
+            'constraints': constraints_sol,
+            'constraints_squared_sum': constraints_squared_sum_sol,
+            'objective': objective_sol
+        }
+
+        return solution
+
+    def get_best_solution(self, results=None):
+        """
+        Get best solution (minimum objective) from results computed or returned by a solver.
+
+        :param results: Optional results to analyze. If not provided, will attempt to use `self.results` computed by
+            a solver.
+
+        :return: Best solution (dictionary).
+        """
 
         if results is None and not hasattr(self, 'results'):
             raise Exception('Attempt to analyze results, but no results exist or have been passed.')
@@ -630,73 +716,43 @@ class TrussStructure(Problem):
             self.bitstring_pos[var.id] = i_pos
             i_pos +=1
 
-        solutions = [{'objective': np.inf} for _ in range(len(results))]
         best_solution = None
-        for i_result, result in enumerate(results):
+        best_objective = np.inf
+        for result in results:
+            solution = self.evaluate_result(result)
             bit_array = self.get_bit_array(result)
-            member_stresses_sol = self.decode_member_stress_solution(result)
-            member_areas_sol = self.decode_member_area_solution(result)
-            member_forces_sol = [member_stresses_sol[i]*member_areas_sol[i] for i in range(len(member_stresses_sol))]
-            complementary_energy_sol = self.complementary_energy(member_stresses_sol, member_areas_sol)
-            volume_sol = self.total_volume(member_areas_sol)
-            joint_residuals_x_sol,  joint_residuals_y_sol, joint_residuals_squared_sum_sol = self.joint_residuals_squared_sum(member_stresses_sol, member_areas_sol)
-            joint_residuals_sol = joint_residuals_x_sol + joint_residuals_y_sol
-            constraints_sol = joint_residuals_sol
-            volume_residual_sol= 0.0
-            if hasattr(self, 'target_volume') and hasattr(self, 'volume_constraint'):
-                if self.target_volume > 0.0:
-                    if self.volume_constraint == 'equality':
-                        volume_residual_sol = (volume_sol-self.target_volume)/self.target_volume
-                    elif self.volume_constraint == 'inequality':
-                         volume_residual_sol = max(0.0, (volume_sol-self.target_volume)/self.target_volume)
-                    else:
-                        raise Exception(f'Unknown volume constraint type ({self.volume_constraint}).')
-                else:
-                    volume_residual_sol = volume_sol
-                constraints_sol.extend([volume_residual_sol])
-            volume_residual_squared_sol = volume_residual_sol**2
-            constraints_squared_sum_sol = joint_residuals_squared_sum_sol + volume_residual_squared_sol
-            objective_sol = complementary_energy_sol + self.penalty_weight * (constraints_squared_sum_sol)
+            solution['bit_array'] = bit_array
+            objective_sol = solution['objective']
 
-            if best_solution is None or objective_sol < best_solution['objective']:
-                best_solution = solutions[i_result]
+            if objective_sol < best_objective:
+                best_solution = solution
+                if hasattr(self, 'ts_ref'):
+                    rel_error_forces, area_mismatch, rel_error_compliance = self.compare_with_reference_solution(best_solution)
+                    best_solution['avg_rel_error_forces'] = np.nanmean(rel_error_forces)
+                    best_solution['rel_error_compliance'] = rel_error_compliance
+                    best_solution['areas_matching'] = not any(area_mismatch)
 
-            solutions[i_result]['bit_array'] = bit_array
-            solutions[i_result]['member_forces'] = member_forces_sol
-            solutions[i_result]['member_stresses'] = member_stresses_sol
-            solutions[i_result]['member_areas'] = member_areas_sol
-            solutions[i_result]['adaptive_vars'] = self.get_adaptive_vars(member_stresses_sol, member_areas_sol)
-            solutions[i_result]['complementary_energy'] = complementary_energy_sol
-            solutions[i_result]['volume'] = volume_sol
-            solutions[i_result]['volume_residual_squared'] = volume_residual_squared_sol
-            solutions[i_result]['joint_residuals_squared_sum'] = joint_residuals_squared_sum_sol
-            solutions[i_result]['constraints'] = constraints_sol
-            solutions[i_result]['constraints_squared_sum'] = constraints_squared_sum_sol
-            solutions[i_result]['objective'] = objective_sol
+                best_objective = objective_sol
 
-            if hasattr(self, 'ts_ref'):
-                rel_error_forces, area_mismatch, rel_error_compliance = self.compare_with_reference_solution(solutions[i_result])
-                solutions[i_result]['avg_rel_error_forces'] = np.average(rel_error_forces)
-                solutions[i_result]['rel_error_compliance'] = rel_error_compliance
-                solutions[i_result]['areas_matching'] = not any(area_mismatch)
-
-
-        print('Best solution (minimum objective):')
-        print(f"Objective: {best_solution['objective']}")
-        print(f"Complementary Energy: {best_solution['complementary_energy']}")
-        print(f"Constraints (squared sum): {best_solution['constraints_squared_sum']}")
-        print(f"Joint Residuals (squared): {best_solution['joint_residuals_squared_sum']}")
-        print(f"Volume: {best_solution['volume']}")
-        print(f"Volume residual (squared): {best_solution['volume_residual_squared']}")
-        print(f"Member Forces: {best_solution['member_forces']}")
-        print(f"Member Stresses: {best_solution['member_stresses']}")
-        print(f"Member Areas: {best_solution['member_areas']}")
+        output =  'Best solution (minimum objective):\n'
+        output += '----------------------------------\n'
+        output += f"Complementary Energy: {best_solution['complementary_energy']}\n"
+        output += f"Volume: {best_solution['volume']}\n"
+        output += f"Objective: {best_solution['objective']}\n"
+        output += f"Constraints (squared sum): {best_solution['constraints_squared_sum']}\n"
+        output += f"\tJoint Residuals (squared): {best_solution['joint_residuals_squared_sum']}\n"
+        output += f"\tVolume residual (squared): {best_solution['volume_residual_squared']}\n"
+        output += f"Member Forces: {best_solution['member_forces']}\n"
+        output += f"Member Stresses: {best_solution['member_stresses']}\n"
+        output += f"Member Areas: {best_solution['member_areas']}\n"
         if hasattr(self, 'ts_ref'):
-            print(f"Average Relative Error in Member Forces: {best_solution['avg_rel_error_forces']}")
-            print(f"Relative Error in Compliance: {best_solution['rel_error_compliance']}")
-            print(f"Areas Matching Reference Solution: {best_solution['areas_matching']}")
+            output += f"Compliance:\n\t Rel. error {best_solution['rel_error_compliance']}\n"
+            output += f"Member Forces:\n\tAverage rel. error {best_solution['avg_rel_error_forces']}\n"
+            output += f"Member Areas:\n\tMatching reference solution: {best_solution['areas_matching']}\n"
+        self.print_and_log(output)
 
-        return solutions
+
+        return best_solution
 
     def decode_member_stress_solution(self, result):
         member_stress_sol = []
@@ -705,6 +761,8 @@ class TrussStructure(Problem):
                 member_stress_sol.append(0.)
             elif type(result) is SampleView:
                 member_stress_sol.append(self.decode_amplify_poly_with_bitstring(member_stress_poly,result._data))
+            elif type(result) is SimpleNamespace:
+                member_stress_sol.append(self.decode_amplify_poly_with_bitstring(member_stress_poly,result.values))
             else:
                 member_stress_sol.append(member_stress_poly.decode(result.values))
         return member_stress_sol
@@ -715,6 +773,8 @@ class TrussStructure(Problem):
             if isinstance(member_area_poly, Poly):
                 if type(result) is SampleView:
                     member_area_sol.append(self.decode_amplify_poly_with_bitstring(member_area_poly,result._data))
+                elif type(result) is SimpleNamespace:
+                    member_area_sol.append(self.decode_amplify_poly_with_bitstring(member_area_poly,result.values))
                 else:
                     member_area_sol.append(member_area_poly.decode(result.values))
             else:
@@ -736,13 +796,13 @@ class TrussStructure(Problem):
         if not loads_equal:
             raise Exception('Loads are not matching.')
 
-        # Check if reference solution is statically determinate (required for unique solution and valid comparison)
+        # Check if reference solution is statically determinate
         statically_determinate_info = self.ts_ref.check_statically_determinate()
         if statically_determinate_info['condition'] != 'determinate':
-            message = f"Reference solution must be statically determinate but is " \
+            output = f"Reference solution is " \
                        f"{statically_determinate_info['condition']} " \
-                       f"with degree {statically_determinate_info['degree']}."
-            raise Exception(message)
+                       f"with degree {statically_determinate_info['degree']}.\n"
+            self.print_and_log(output)
 
     def compare_with_reference_solution(self, solution):
         if not hasattr(self, 'ts_ref'):
@@ -756,17 +816,9 @@ class TrussStructure(Problem):
         # Compute reference solution
         self.member_forces_ref_sol, self.compliance_ref_sol = self.ts_ref.compute_member_forces()
 
-        # Compute relative error in member forces and compliance
-        member_forces = solution['member_forces']
-        rel_error_forces = []
-        for i_member in range(len(self.member_forces_ref_sol)):
-            rel_error_force = abs((self.member_forces_ref_sol[i_member]-member_forces[i_member])) \
-                /abs(self.member_forces_ref_sol[i_member])
-            rel_error_forces.append(rel_error_force)
-
+        # Compute relative error in compliance
         compliance = 2.*solution['complementary_energy']
         rel_error_compliance = abs((self.compliance_ref_sol-compliance))/abs(self.compliance_ref_sol)
-
 
         # Check if members present in solution and reference solution match
         ref_members = {
@@ -794,6 +846,25 @@ class TrussStructure(Problem):
             if key in missing_in_ts:
                 area_mismatch[i_member] = True
 
+        # Compute relative error in member forces e if all members match.
+        # This only makes sense if the members in the solution and reference solution match.
+        if not any(area_mismatch):
+            member_forces = solution['member_forces']
+            member_areas = solution['member_areas']
+            active_indices = [i for i, area in enumerate(member_areas) if area > 0.0]
+            filtered_member_forces = [member_forces[i] for i in active_indices]
+
+            rel_error_forces = []
+            for i_member in range(len(self.member_forces_ref_sol)):
+                if self.member_forces_ref_sol[i_member] != 0:
+                    rel_error_force = abs((self.member_forces_ref_sol[i_member]-filtered_member_forces[i_member])) \
+                        /abs(self.member_forces_ref_sol[i_member])
+                else:
+                    rel_error_force = np.nan
+                rel_error_forces.append(rel_error_force)
+        else:
+
+            rel_error_forces = [np.nan for _ in self.members]
 
 
         return rel_error_forces, area_mismatch, rel_error_compliance

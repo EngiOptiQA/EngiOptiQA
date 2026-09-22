@@ -1,13 +1,15 @@
-from .annealing_solvers import *
 from .problems import *
+from .solvers import *
 __all__ = [
     "AnnealingSolverAmplify",
     "AnnealingSolverDWave",
     "AnnealingSolverOpenJij",
+    "BruteForceSolver",
     "DesignOptimizationProblemRod1D",
     "PowerFlow",
     "PowerFlowData",
     "Rod1D",
+    "QAOASolverPennylane",
     "StructuralAnalysisProblemRod1D",
     "TrussStructure",
     "TrussStructureOptimization",

@@ -7,6 +7,12 @@ matplotlib~=3.10
 numpy~=2.0
 openjij~=0.11
 pandas~=2.3
+pennylane~=0.44
+pennylane-lightning
 prettytable~=3.17
 scipy~=1.16
 sympy~=1.14
+
+# Optional: only required for QAOASolverPennylane's 'MQSSPennylaneDevice' device (LRZ's Munich Quantum Software Stack)
+# mqss-pennylane-adapter
+# qiskit<2
