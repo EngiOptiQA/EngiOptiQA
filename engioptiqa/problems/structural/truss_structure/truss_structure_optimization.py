@@ -4,8 +4,8 @@ from engioptiqa.variables.real_number import RealNumber
 from .truss_structure import TrussStructure
 
 class TrussStructureOptimization(TrussStructure):
-    def __init__(self, volume_constraint = {}, output_path=None):
-        super().__init__(output_path)
+    def __init__(self, volume_constraint = {}, nsd=2, output_path=None):
+        super().__init__(nsd=nsd, output_path=output_path)
         self.volume_constraint = volume_constraint
         if volume_constraint['mode'] == 'direct':
              self.target_volume = volume_constraint.get('target', None)
@@ -129,8 +129,8 @@ class TrussStructureOptimization(TrussStructure):
             self.generate_slack_variable()
 
 class TrussStructureOptimizationContinuous(TrussStructureOptimization):
-    def __init__(self, volume_constraint={}, output_path=None):
-        super().__init__(volume_constraint=volume_constraint, output_path=output_path)
+    def __init__(self, volume_constraint={}, nsd=2, output_path=None):
+        super().__init__(volume_constraint=volume_constraint, nsd=nsd, output_path=output_path)
 
     def get_initial_number_of_problem_variables(self):
         n_existent_members = self.get_number_of_existent_members()
@@ -278,3 +278,69 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
             start, end = self.get_position_in_bit_array(i_group, i_var)
             sol_bit_array[start:end] = sol_encoded[i_var]
         return sol_bit_array
+
+    def compare_with_reference_solution(self, solution):
+        if not hasattr(self, 'ts_ref'):
+            raise Exception('No reference solution set for comparison')
+
+        # Ensure that nodes in the reference solution are matching
+        for node_id, node_coords in self.ts_ref.nodes.items():
+            if self.nodes[node_id] != node_coords:
+                raise Exception('Nodes in the provided reference solution are not matching.')
+
+        # Compute reference solution
+        self.member_forces_ref_sol, self.compliance_ref_sol = self.ts_ref.compute_member_forces()
+
+        # Compute relative error in compliance
+        compliance = 2.*solution['complementary_energy']
+        rel_error_compliance = abs((self.compliance_ref_sol-compliance))/abs(self.compliance_ref_sol)
+
+        # Check if members present in solution and reference solution match
+        ref_members = {
+            (member.node_id_0, member.node_id_1, member.A)
+            for member in self.ts_ref.members
+        }
+
+        # Check if members with non-zero cross-sectional area (A > 0) also exist in reference solution
+        area_mismatch = [False for _ in self.members]
+        match = lambda k, r: k[:2] == r[:2] and np.isclose(k[2], r[2], rtol=0.0, atol=0.02)
+        for i_member, member in enumerate(self.members):
+            member_area = solution['member_areas'][i_member]
+            if member_area > 1e-12:
+                key = (member.node_id_0, member.node_id_1, member_area)
+                if not any(match(key, r) for r in ref_members):
+                    area_mismatch[i_member] = True
+
+        # Detect members that exist in the reference solution but are missing in the solution
+        member_areas = solution['member_areas']
+        members = {
+            (member.node_id_0, member.node_id_1, member_areas[i_member])
+            for i_member, member in enumerate(self.members)
+        }
+        missing_in_ts = {r for r in ref_members if not any(match(m, r) for m in members)}
+        for i_member, key in enumerate(ref_members):
+            if key in missing_in_ts:
+                area_mismatch[i_member] = True
+
+        # Compute relative error in member forces e if all members match.
+        # This only makes sense if the members in the solution and reference solution match.
+        if not any(area_mismatch):
+            member_forces = solution['member_forces']
+            member_areas = solution['member_areas']
+            active_indices = [i for i, area in enumerate(member_areas) if area > 0.0]
+            filtered_member_forces = member_forces if len(member_forces) == len(self.member_forces_ref_sol) else [member_forces[i] for i in active_indices]
+            rel_error_forces = []
+            for i_member in range(len(self.member_forces_ref_sol)):
+                if self.member_forces_ref_sol[i_member] != 0:
+                    rel_error_force = abs((self.member_forces_ref_sol[i_member]-filtered_member_forces[i_member])) \
+                        /abs(self.member_forces_ref_sol[i_member])
+                else:
+                    rel_error_force = np.nan
+                rel_error_forces.append(rel_error_force)
+        else:
+
+            rel_error_forces = [np.nan for _ in self.members]
+
+
+        return rel_error_forces, area_mismatch, rel_error_compliance
+
