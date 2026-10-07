@@ -15,23 +15,26 @@ from engioptiqa.variables.real_number import RealNumber
 from .truss_member import TrussMember
 
 class TrussStructure(Problem):
-    def __init__(self, output_path = None):
+    def __init__(self, output_path = None, nsd=2):
         """
         Class representing a truss structure analysis problem.
 
+        :param nsd: Number of spatial dimensions (2 for 2D, 3 for 3D truss structures).
         :param output_path: Optional path for saving results.
         """
 
         super().__init__(output_path)
-        self.nsd = 2
-        self.nodes = {}  # Dictionary to store nodes: {node_id: (x, y)}
+        if nsd not in (2, 3):
+            raise ValueError("nsd must be either 2 or 3.")
+        self.nsd = nsd
+        self.nodes = {}  # Dictionary to store nodes: {node_id: (x, y) or (x, y, z)}
         self.n_nodes = 0
         self.members = []  # List to store truss members
         self.n_members = 0
         self.optional_members = []  # List to store optional members (if any)
         self.n_optional_members = 0
-        self.loads = {}  # Dictionary to store external forces: {node_id: (Fx, Fy)}
-        self.supports = {}  # Dictionary to store support conditions: {node_id: (x_fixed, y_fixed)}
+        self.loads = {}  # Dictionary to store external forces: {node_id: (Fx, Fy) or (Fx, Fy, Fz)}
+        self.supports = {}  # Dictionary to store support conditions: {node_id: (x_fixed, y_fixed) or (x_fixed, y_fixed, z_fixed)}
 
         self.penalty_weight = 0.0
 
@@ -43,7 +46,7 @@ class TrussStructure(Problem):
         Add a node to the truss structure.
 
         :param node_id: Unique identifier for the node (e.g., integer or string).
-        :param coordinates: Tuple (x, y) representing the node's position.
+        :param coordinates: Tuple (x, y) or (x, y, z) representing the node's position, matching `self.nsd`.
         """
         if len(coordinates) != self.nsd:
             raise Exception(f"Only {self.nsd}D coordinates allowed!")
@@ -130,10 +133,12 @@ class TrussStructure(Problem):
         Add an external load to a node.
 
         :param node_id: ID of the node where the load is applied.
-        :param force: Tuple (Fx, Fy) representing the force components in x and y directions.
+        :param force: Tuple (Fx, Fy) or (Fx, Fy, Fz) representing the force components, matching `self.nsd`.
         """
         if node_id not in self.nodes:
             raise ValueError("Node must exist in the structure before adding a load.")
+        if len(force) != self.nsd:
+            raise ValueError(f"Only {self.nsd}D force tuples allowed.")
 
         self.loads[node_id] = force
 
@@ -145,18 +150,23 @@ class TrussStructure(Problem):
         """
         return self.loads
 
-    def add_support(self, node_id, x_fixed=True, y_fixed=True):
+    def add_support(self, node_id, x_fixed=True, y_fixed=True, z_fixed=True):
         """
         Add a support condition to a node.
 
         :param node_id: ID of the node where the support is applied.
         :param x_fixed: Boolean indicating if the x-direction is fixed (default: True).
         :param y_fixed: Boolean indicating if the y-direction is fixed (default: True).
+        :param z_fixed: Boolean indicating if the z-direction is fixed (3D only, default: True; ignored for 2D).
         """
         if node_id not in self.nodes:
             raise ValueError("Node must exist in the structure before adding a support.")
 
-        self.supports[node_id] = (x_fixed, y_fixed)
+        fixed = (x_fixed, y_fixed)
+        if self.nsd == 3:
+            fixed += (z_fixed,)
+
+        self.supports[node_id] = fixed
 
     def get_support_info(self):
         """
@@ -169,13 +179,8 @@ class TrussStructure(Problem):
     def get_n_fixed(self):
         n_fixed = 0
         for i_node in range(self.n_nodes):
-            x_fixed = y_fixed = False
-            if i_node in self.supports.keys():
-                x_fixed, y_fixed = self.supports[i_node]
-            if x_fixed:
-                n_fixed += 1
-            if y_fixed:
-                n_fixed += 1
+            fixed = self.supports.get(i_node, (False,) * self.nsd)
+            n_fixed += sum(1 for f in fixed if f)
         return n_fixed
 
     def check_statically_determinate(self):
@@ -190,11 +195,8 @@ class TrussStructure(Problem):
         j = len(nodes)   # Number of joints connected to existent members
         # Reaction count: sum of fixed directions over supports
         r = 0
-        for _, (xf, yf) in self.supports.items():
-            if xf:
-                r += 1
-            if yf:
-                r += 1
+        for _, fixed in self.supports.items():
+            r += sum(1 for f in fixed if f)
 
         # Determinacy condition for truss: m + r = nsd*j
         degree = (m + r) - self.nsd * j
@@ -233,6 +235,12 @@ class TrussStructure(Problem):
 
         :param subtitle: Subtitle for the plot.
         """
+        if self.nsd == 3:
+            self.visualize_3d(subtitle, interactive)
+        else:
+            self.visualize_2d(subtitle, interactive)
+
+    def visualize_2d(self, subtitle='', interactive=False):
         fig, ax = plt.subplots(figsize=(8, 6))
 
         x_max = max([coord[0] for coord in self.nodes.values()])
@@ -304,6 +312,75 @@ class TrussStructure(Problem):
             plt.show()
         plt.close(fig)
 
+    def visualize_3d(self, subtitle='', interactive=False):
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111, projection='3d')
+
+        coords = np.array(list(self.nodes.values()))
+        mins = coords.min(axis=0)
+        maxs = coords.max(axis=0)
+        d = maxs - mins
+        d_mean = np.mean(d)
+
+        # Plot nodes
+        for node_id, (x, y, z) in self.nodes.items():
+            if node_id not in self.supports.keys():
+                ax.plot([x], [y], [z], 'o', color='green', zorder=2)
+            ax.text(x - 0.05*d_mean, y - 0.05*d_mean, z - 0.05*d_mean, f"{node_id}", fontsize=12, zorder=3)
+
+        # Plot members
+        A_max = max([member.A for member in self.members if member.exists]) if any(member.exists for member in self.members) else 1.0
+
+        for i_member, member in enumerate(self.members):
+            if member.exists:
+                x0, y0, z0 = member.get_coords(local_node_id=0)
+                x1, y1, z1 = member.get_coords(local_node_id=1)
+                lw = max(member.A / A_max * 5, 0.1)
+                label = "Member" if i_member == 0 else None
+                if member in self.optional_members:
+                    ax.plot([x0, x1], [y0, y1], [z0, z1], color='gray', linestyle='dashed', lw=1, label=label, zorder=1)
+                else:
+                    ax.plot([x0, x1], [y0, y1], [z0, z1], color='gray', lw=1, label=label, zorder=1)
+
+        # Plot loads
+        for node_id, (Fx, Fy, Fz) in self.loads.items():
+            x, y, z = self.nodes[node_id]
+            F_norm = (Fx**2 + Fy**2 + Fz**2)**0.5
+            if F_norm > 0:
+                arrow_length = 0.5 * np.max(d)
+                ax.quiver(x, y, z, Fx / F_norm * arrow_length, Fy / F_norm * arrow_length, Fz / F_norm * arrow_length, color='red', zorder=1)  # Loads as red arrows
+
+        # Plot supports
+        for node_id, (x_fixed, y_fixed, z_fixed) in self.supports.items():
+            x, y, z = self.nodes[node_id]
+            if x_fixed and y_fixed and z_fixed:
+                ax.plot([x], [y], [z], 's', color='blue', zorder=2)  # Fully fixed supports as blue squares
+            else:
+                ax.plot([x], [y], [z], '^', color='blue', zorder=2)  # Partially fixed supports as blue triangles
+
+        # Custom legend entries
+        legend_elements = [
+            Line2D([0], [0], color='gray', lw=2, label='Members'),
+            Line2D([0], [0], marker='o', color='green', markersize=8, label='Nodes', linestyle='None'),
+            Line2D([0], [0], marker='s', color='blue', markersize=8, label='Supports', linestyle='None'),
+            Line2D([0], [0], color='red', lw=2, label='Loads (Scaled)'),
+        ]
+
+        # Add legend
+        ax.legend(handles=legend_elements, loc="upper right")
+
+        # Set plot properties
+        ax.set_box_aspect((1, 1, 1))
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_zlabel("Z")
+        ax.set_title("Truss Structure: " + subtitle)
+        if self.output_path is not None:
+            plt.savefig(self.output_path / f"truss_structure_{subtitle.lower().replace(' ', '_')}.png", dpi=600)
+        if interactive:
+            plt.show()
+        plt.close(fig)
+
     def get_existent_members_and_involved_nodes(self):
         """
         Filter out non-existent members (with zero cross-sectional area) and nodes without any existent member.
@@ -323,8 +400,6 @@ class TrussStructure(Problem):
 
         return existent_members, involved_nodes
 
-
-
     def compute_member_forces(self):
         """
         Compute axial forces in the truss members using the method of joints.
@@ -332,12 +407,13 @@ class TrussStructure(Problem):
         """
 
         members, nodes = self.get_existent_members_and_involved_nodes()
+        nsd = self.nsd
 
         # Number of nodes
         num_nodes = len(nodes)
 
         # Initialize global force matrix and displacement vector
-        num_equations = 2 * num_nodes  # Two equations per node (Fx and Fy)
+        num_equations = nsd * num_nodes  # nsd equations per node
         global_matrix = np.zeros((num_equations, num_equations))
         global_force = np.zeros(num_equations)
 
@@ -345,56 +421,44 @@ class TrussStructure(Problem):
         node_index_map = {node_id: i for i, node_id in enumerate(nodes)}
 
         # Assemble global force vector
-        for node_id, (Fx, Fy) in self.loads.items():
-            index_x = 2 * node_index_map[node_id]
-            index_y = index_x + 1
-            global_force[index_x] += Fx
-            global_force[index_y] += Fy
+        for node_id, force in self.loads.items():
+            index_0 = nsd * node_index_map[node_id]
+            global_force[index_0:index_0 + nsd] += force
 
         # Assemble global stiffness matrix
         for member in members.values():
             node_id_0 = member.node_id_0
             node_id_1 = member.node_id_1
-            # Get direction cosines
-            l, m = member.direction_cosines_0
+            # Direction cosines vector, e.g. (l, m) in 2D or (l, m, n) in 3D
+            dcos = np.array(member.direction_cosines_0)
             L = member.length
 
             # Get indices for the nodes
-            index_0_x = 2 * node_index_map[node_id_0]
-            index_0_y = index_0_x + 1
-            index_1_x = 2 * node_index_map[node_id_1]
-            index_1_y = index_1_x + 1
+            index_0 = nsd * node_index_map[node_id_0]
+            index_1 = nsd * node_index_map[node_id_1]
 
-            # Stiffness matrix for the member
+            # Stiffness matrix for the member: k * B^T B, with B = [dcos, -dcos]
             k = member.E * member.A / L
-            member_matrix = k * np.array([
-                [l**2, l*m, -l**2, -l*m],
-                [l*m, m**2, -l*m, -m**2],
-                [-l**2, -l*m, l**2, l*m],
-                [-l*m, -m**2, l*m, m**2]
-            ])
+            b = np.concatenate([dcos, -dcos])
+            member_matrix = k * np.outer(b, b)
 
             # Add member stiffness matrix to global stiffness matrix
-            global_matrix[index_0_x:index_0_y+1, index_0_x:index_0_y+1] += member_matrix[:2, :2]
-            global_matrix[index_0_x:index_0_y+1, index_1_x:index_1_y+1] += member_matrix[:2, 2:]
-            global_matrix[index_1_x:index_1_y+1, index_0_x:index_0_y+1] += member_matrix[2:, :2]
-            global_matrix[index_1_x:index_1_y+1, index_1_x:index_1_y+1] += member_matrix[2:, 2:]
+            global_matrix[index_0:index_0+nsd, index_0:index_0+nsd] += member_matrix[:nsd, :nsd]
+            global_matrix[index_0:index_0+nsd, index_1:index_1+nsd] += member_matrix[:nsd, nsd:]
+            global_matrix[index_1:index_1+nsd, index_0:index_0+nsd] += member_matrix[nsd:, :nsd]
+            global_matrix[index_1:index_1+nsd, index_1:index_1+nsd] += member_matrix[nsd:, nsd:]
 
         # Apply support conditions
-        for node_id, (x_fixed, y_fixed) in self.supports.items():
+        for node_id, fixed in self.supports.items():
             if node_id in nodes:
-                index_x = 2 * node_index_map[node_id]
-                index_y = index_x + 1
-                if x_fixed:
-                    global_matrix[index_x, :] = 0
-                    global_matrix[:, index_x] = 0
-                    global_matrix[index_x, index_x] = 1
-                    global_force[index_x] = 0
-                if y_fixed:
-                    global_matrix[index_y, :] = 0
-                    global_matrix[:, index_y] = 0
-                    global_matrix[index_y, index_y] = 1
-                    global_force[index_y] = 0
+                index_0 = nsd * node_index_map[node_id]
+                for a, is_fixed in enumerate(fixed):
+                    if is_fixed:
+                        index = index_0 + a
+                        global_matrix[index, :] = 0
+                        global_matrix[:, index] = 0
+                        global_matrix[index, index] = 1
+                        global_force[index] = 0
 
         # Solve for displacements
         displacements = np.linalg.solve(global_matrix, global_force)
@@ -405,21 +469,17 @@ class TrussStructure(Problem):
         for i_member, member in members.items():
             node_id_0 = member.node_id_0
             node_id_1 = member.node_id_1
-            l, m = member.direction_cosines_0
+            dcos = np.array(member.direction_cosines_0)
             L = member.length
-            index_0_x = 2 * node_index_map[node_id_0]
-            index_0_y = index_0_x + 1
-            index_1_x = 2 * node_index_map[node_id_1]
-            index_1_y = index_1_x + 1
+            index_0 = nsd * node_index_map[node_id_0]
+            index_1 = nsd * node_index_map[node_id_1]
 
             # Relative displacements
-            u1 = displacements[index_0_x]
-            v1 = displacements[index_0_y]
-            u2 = displacements[index_1_x]
-            v2 = displacements[index_1_y]
+            u0 = displacements[index_0:index_0+nsd]
+            u1 = displacements[index_1:index_1+nsd]
 
             # Axial force in the member
-            axial_force = member.E * member.A / L * (l * (u2 - u1) + m * (v2 - v1))
+            axial_force = member.E * member.A / L * np.dot(dcos, u1 - u0)
             member_forces[i_member] = axial_force
 
         return member_forces, compliance
@@ -531,13 +591,13 @@ class TrussStructure(Problem):
         # Equilibrium (automatically fulfilled without body forces)
 
         # Traction boundary conditions (joint forces must be zero)
-        joint_forces_x = [0. for _ in range(len(self.nodes))]
-        joint_forces_y = [0. for _ in range(len(self.nodes))]
+        nsd = self.nsd
+        joint_forces = [[0. for _ in range(nsd)] for _ in range(len(self.nodes))]
 
         # Add load contributions
-        for node_id, (Fx, Fy) in self.loads.items():
-            joint_forces_x[node_id] += Fx
-            joint_forces_y[node_id] += Fy
+        for node_id, force in self.loads.items():
+            for a in range(nsd):
+                joint_forces[node_id][a] += force[a]
 
         # Add member contributions
         for i_member, member in enumerate(self.members):
@@ -547,56 +607,52 @@ class TrussStructure(Problem):
             F = member_stresses[i_member] * member_areas[i_member]
 
             # Get direction cosines
-            l, m = member.direction_cosines_0
-            joint_forces_x[node_id_0] += F * l
-            joint_forces_y[node_id_0] += F * m
+            dcos_0 = member.direction_cosines_0
+            for a in range(nsd):
+                joint_forces[node_id_0][a] += F * dcos_0[a]
 
-            l, m = member.direction_cosines_1
-            joint_forces_x[node_id_1] += F * l
-            joint_forces_y[node_id_1] += F * m
+            dcos_1 = member.direction_cosines_1
+            for a in range(nsd):
+                joint_forces[node_id_1][a] += F * dcos_1[a]
 
         # Sum the squared residual forces over all joints (ignore supports)
         n_loads = len(self.loads)
         if n_loads > 0:
             total_mag = 0.0
-            for x, y in self.loads.values():
-                total_mag += np.sqrt(x**2+ y**2)
+            for force in self.loads.values():
+                total_mag += np.sqrt(sum(f**2 for f in force))
             scale = total_mag/n_loads
         else:
             raise Exception('No loads specified.')
 
-        bc_cons_x = []
-        bc_cons_y = []
+        bc_cons = []
 
         for i_node in range(self.n_nodes):
-            x_fixed = y_fixed = False
+            fixed = (False,) * nsd
             if i_node in self.supports.keys():
-                x_fixed, y_fixed = self.supports[i_node]
-            if not x_fixed:
-                bc_cons_x.append(joint_forces_x[i_node]/scale)
-            if not y_fixed:
-                bc_cons_y.append(joint_forces_y[i_node]/scale)
+                fixed = self.supports[i_node]
+            for a in range(nsd):
+                if not fixed[a]:
+                    bc_cons.append(joint_forces[i_node][a]/scale)
 
-        return bc_cons_x, bc_cons_y
+        return bc_cons
 
     def joint_residuals_squared_sum(self, member_stresses, member_areas):
 
-        bc_cons_x, bc_cons_y = self.joint_residuals(member_stresses, member_areas)
+        bc_cons = self.joint_residuals(member_stresses, member_areas)
 
         bc_cons_poly = 0.0
-        for bc_con in bc_cons_x:
+        for bc_con in bc_cons:
             bc_cons_poly += bc_con**2
-        for bc_con in bc_cons_y:
-            bc_cons_poly += bc_con**2
-        return bc_cons_x, bc_cons_y, bc_cons_poly
+        return bc_cons, bc_cons_poly
 
     def generate_joint_residuals_poly(self):
         member_stresses = self.member_stress_polys
         member_areas = self.member_area_polys
 
-        bc_cons_x, bc_cons_y, bc_cons_sq_sum = self.joint_residuals_squared_sum(member_stresses, member_areas)
+        bc_cons, bc_cons_sq_sum = self.joint_residuals_squared_sum(member_stresses, member_areas)
         self.joint_residuals_squared_sum_poly = bc_cons_sq_sum
-        self.joint_residual_polys = bc_cons_x + bc_cons_y
+        self.joint_residual_polys = bc_cons
 
     def generate_constraint_polys(self):
         self.generate_joint_residuals_poly()
@@ -651,8 +707,7 @@ class TrussStructure(Problem):
         complementary_energy_sol = self.complementary_energy(member_stresses_sol, member_areas_sol)
         volume_sol = self.total_volume(member_areas_sol)
         # Evaluate constraints (joint residuals and volume constraint, if any).
-        joint_residuals_x_sol,  joint_residuals_y_sol, joint_residuals_squared_sum_sol = self.joint_residuals_squared_sum(member_stresses_sol, member_areas_sol)
-        joint_residuals_sol = joint_residuals_x_sol + joint_residuals_y_sol
+        joint_residuals_sol, joint_residuals_squared_sum_sol = self.joint_residuals_squared_sum(member_stresses_sol, member_areas_sol)
         constraints_sol = joint_residuals_sol
         volume_residual_sol= 0.0
         if hasattr(self, 'volume_constraint'):

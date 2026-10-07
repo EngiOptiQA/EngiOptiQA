@@ -4,8 +4,8 @@ from engioptiqa.variables.real_number import RealNumber
 from .truss_structure import TrussStructure
 
 class TrussStructureOptimization(TrussStructure):
-    def __init__(self, volume_constraint = {}, output_path=None):
-        super().__init__(output_path)
+    def __init__(self, volume_constraint = {}, output_path=None, nsd=2):
+        super().__init__(nsd=nsd, output_path=output_path)
         self.volume_constraint = volume_constraint
         if volume_constraint['mode'] == 'direct':
              self.target_volume = volume_constraint.get('target', None)
@@ -129,8 +129,8 @@ class TrussStructureOptimization(TrussStructure):
             self.generate_slack_variable()
 
 class TrussStructureOptimizationContinuous(TrussStructureOptimization):
-    def __init__(self, volume_constraint={}, output_path=None):
-        super().__init__(volume_constraint=volume_constraint, output_path=output_path)
+    def __init__(self, volume_constraint={}, nsd=2, output_path=None):
+        super().__init__(volume_constraint=volume_constraint, nsd=nsd, output_path=output_path)
 
     def get_initial_number_of_problem_variables(self):
         n_existent_members = self.get_number_of_existent_members()
