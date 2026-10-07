@@ -15,7 +15,7 @@ from engioptiqa.variables.real_number import RealNumber
 from .truss_member import TrussMember
 
 class TrussStructure(Problem):
-    def __init__(self, output_path = None, nsd=2):
+    def __init__(self, nsd, output_path = None):
         """
         Class representing a truss structure analysis problem.
 
@@ -230,155 +230,97 @@ class TrussStructure(Problem):
         return n_existent_optional_members
 
     def visualize(self, subtitle='', interactive=False):
-        """
-        Visualize the truss structure, including nodes, members, loads, and supports.
+        """Visualize the truss structure, including nodes, members, loads, and supports."""
 
-        :param subtitle: Subtitle for the plot.
-        """
-        if self.nsd == 3:
-            self.visualize_3d(subtitle, interactive)
+        nsd = self.nsd
+
+        is_3d = nsd == 3
+        coords = np.asarray(list(self.nodes.values()), dtype=float)[:, :nsd]
+        spans = np.ptp(coords, axis=0)
+        d_mean = np.mean(spans) or 1.0
+        max_span = np.max(spans) or 1.0
+        offset = 0.05 * d_mean
+
+        if is_3d:
+            fig = plt.figure(figsize=(8, 6))
+            ax = fig.add_subplot(111, projection='3d')
         else:
-            self.visualize_2d(subtitle, interactive)
+            fig, ax = plt.subplots(figsize=(8, 6))
 
-    def visualize_2d(self, subtitle='', interactive=False):
-        fig, ax = plt.subplots(figsize=(8, 6))
+        # Nodes
+        for node_id, coord in self.nodes.items():
+            p = np.asarray(coord, dtype=float)[:nsd]
+            if node_id not in self.supports:
+                ax.plot(*[[c] for c in p], 'o', color='green', zorder=2)
+            ax.text(*(p - offset), f"{node_id}", fontsize=12, zorder=3)
 
-        x_max = max([coord[0] for coord in self.nodes.values()])
-        x_min = min([coord[0] for coord in self.nodes.values()])
-        dx = x_max - x_min
-        y_max = max([coord[1] for coord in self.nodes.values()])
-        y_min = min([coord[1] for coord in self.nodes.values()])
-        dy = y_max - y_min
-        dx_dy_mean = np.mean([dx,dy])
+        # Members
+        existing_members = [m for m in self.members if m.exists]
+        A_max = max((m.A for m in existing_members), default=1.0) or 1.0
 
-        # Plot nodes
-        for node_id, (x, y) in self.nodes.items():
-            if node_id not in self.supports.keys():
-                ax.plot(x, y, 'o', color='green', zorder=2)
-            ax.text(x - 0.05*dx_dy_mean, y - 0.05*dx_dy_mean, f"{node_id}", fontsize=12, zorder=3)
+        for member in existing_members:
+            p0 = np.asarray(member.get_coords(local_node_id=0), dtype=float)[:nsd]
+            p1 = np.asarray(member.get_coords(local_node_id=1), dtype=float)[:nsd]
+            lw = max(member.A / A_max * 5, 0.1)
+            linestyle = 'dashed' if member in self.optional_members else 'solid'
+            ax.plot(*[[p0[i], p1[i]] for i in range(nsd)], color='gray', linestyle=linestyle, lw=lw, zorder=1)
 
-        # Plot members
-        A_max = max([member.A for member in self.members if member.exists]) if any(member.exists for member in self.members) else 1.0
+        # Loads
+        for node_id, load in self.loads.items():
+            p = np.asarray(self.nodes[node_id], dtype=float)[:nsd]
+            F = np.asarray(load, dtype=float)[:nsd]
+            F_norm = np.linalg.norm(F)
+            if F_norm == 0:
+                continue
 
-        for i_member, member in enumerate(self.members):
-            if member.exists:
-                x0, y0 = member.get_coords(local_node_id = 0)
-                x1, y1 = member.get_coords(local_node_id = 1)
-                lw = max(member.A / A_max * 5, 0.1)
-                label = "Member" if i_member == 0 else None
-                if member in self.optional_members:
-                    ax.plot([x0, x1], [y0, y1], color='gray', linestyle='dashed', lw=lw, label=label, zorder=1)
-                else:
-                    ax.plot([x0, x1], [y0, y1], color='gray',lw=lw, label=label, zorder=1)
+            dF = F / F_norm * 0.5 * max_span
 
-        # Plot loads
-        for node_id, (Fx, Fy) in self.loads.items():
-            x, y = self.nodes[node_id]
-            F_norm = (Fx**2 + Fy**2)**0.5
-            ax.arrow(x, y, Fx / (2*F_norm) * dx, Fy / (2*F_norm) * dy, color='red', zorder=1,
-                     head_width=0.02*np.sqrt(dx**2 + dy**2), length_includes_head=True)  # Loads as red arrows
-
-        # Plot supports
-        for node_id, (x_fixed, y_fixed) in self.supports.items():
-            x, y = self.nodes[node_id]
-            if x_fixed and y_fixed:
-                ax.plot(x, y, 's', color='blue', zorder=2)  # Fixed supports as blue squares
-            elif x_fixed:
-                ax.plot(x, y, '>', color='blue', zorder=2)  # Pinned supports (x) as blue triangles
-            elif y_fixed:
-                ax.plot(x, y, '^', color='blue', zorder=2)  # Pinned supports (y) as blue triangles
-
-        # Custom legend entries
-        legend_elements = [
-            Line2D([0], [0], color='gray', lw=2, label='Members'),
-            Line2D([0], [0], marker='o', color='green', markersize=8, label='Nodes', linestyle='None'),
-            Line2D([0], [0], marker='s', color='blue', markersize=8, label='Supports', linestyle='None'),
-            Line2D([0], [0], color='red', lw=2, label='Loads (Scaled)'),
-        ]
-
-        # Add legend
-        ax.legend(handles=legend_elements, loc="upper right")
-
-        # Set plot properties
-        ax.set_aspect('equal', adjustable='datalim')
-        ax.set_axisbelow(True)
-        ax.grid(True)
-        plt.xlabel("X")
-        plt.ylabel("Y")
-        plt.title("Truss Structure: " + subtitle)
-        if self.output_path is not None:
-            plt.savefig(self.output_path / f"truss_structure_{subtitle.lower().replace(' ', '_')}.png", dpi=600)
-        if interactive:
-            plt.show()
-        plt.close(fig)
-
-    def visualize_3d(self, subtitle='', interactive=False):
-        fig = plt.figure(figsize=(8, 6))
-        ax = fig.add_subplot(111, projection='3d')
-
-        coords = np.array(list(self.nodes.values()))
-        mins = coords.min(axis=0)
-        maxs = coords.max(axis=0)
-        d = maxs - mins
-        d_mean = np.mean(d)
-
-        # Plot nodes
-        for node_id, (x, y, z) in self.nodes.items():
-            if node_id not in self.supports.keys():
-                ax.plot([x], [y], [z], 'o', color='green', zorder=2)
-            ax.text(x - 0.05*d_mean, y - 0.05*d_mean, z - 0.05*d_mean, f"{node_id}", fontsize=12, zorder=3)
-
-        # Plot members
-        A_max = max([member.A for member in self.members if member.exists]) if any(member.exists for member in self.members) else 1.0
-
-        for i_member, member in enumerate(self.members):
-            if member.exists:
-                x0, y0, z0 = member.get_coords(local_node_id=0)
-                x1, y1, z1 = member.get_coords(local_node_id=1)
-                lw = max(member.A / A_max * 5, 0.1)
-                label = "Member" if i_member == 0 else None
-                if member in self.optional_members:
-                    ax.plot([x0, x1], [y0, y1], [z0, z1], color='gray', linestyle='dashed', lw=1, label=label, zorder=1)
-                else:
-                    ax.plot([x0, x1], [y0, y1], [z0, z1], color='gray', lw=1, label=label, zorder=1)
-
-        # Plot loads
-        for node_id, (Fx, Fy, Fz) in self.loads.items():
-            x, y, z = self.nodes[node_id]
-            F_norm = (Fx**2 + Fy**2 + Fz**2)**0.5
-            if F_norm > 0:
-                arrow_length = 0.5 * np.max(d)
-                ax.quiver(x, y, z, Fx / F_norm * arrow_length, Fy / F_norm * arrow_length, Fz / F_norm * arrow_length, color='red', zorder=1)  # Loads as red arrows
-
-        # Plot supports
-        for node_id, (x_fixed, y_fixed, z_fixed) in self.supports.items():
-            x, y, z = self.nodes[node_id]
-            if x_fixed and y_fixed and z_fixed:
-                ax.plot([x], [y], [z], 's', color='blue', zorder=2)  # Fully fixed supports as blue squares
+            if is_3d:
+                ax.quiver(p[0], p[1], p[2], dF[0], dF[1], dF[2], color='red', zorder=1)
             else:
-                ax.plot([x], [y], [z], '^', color='blue', zorder=2)  # Partially fixed supports as blue triangles
+                ax.arrow(p[0], p[1], dF[0], dF[1], color='red', zorder=1,
+                        head_width=0.02 * max_span, length_includes_head=True)
 
-        # Custom legend entries
+        # Supports
+        for node_id, fixed in self.supports.items():
+            p = np.asarray(self.nodes[node_id], dtype=float)[:nsd]
+            fixed = tuple(fixed[:nsd])
+
+            if is_3d:
+                marker = 's' if all(fixed) else '^'
+            else:
+                x_fixed, y_fixed = fixed
+                marker = 's' if x_fixed and y_fixed else '>' if x_fixed else '^' if y_fixed else 'o'
+
+            ax.plot(*[[c] for c in p], marker, color='blue', zorder=2)
+
         legend_elements = [
             Line2D([0], [0], color='gray', lw=2, label='Members'),
             Line2D([0], [0], marker='o', color='green', markersize=8, label='Nodes', linestyle='None'),
             Line2D([0], [0], marker='s', color='blue', markersize=8, label='Supports', linestyle='None'),
             Line2D([0], [0], color='red', lw=2, label='Loads (Scaled)'),
         ]
-
-        # Add legend
         ax.legend(handles=legend_elements, loc="upper right")
 
-        # Set plot properties
-        ax.set_box_aspect((1, 1, 1))
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
-        ax.set_zlabel("Z")
+
+        if is_3d:
+            ax.set_zlabel("Z")
+            ax.set_box_aspect((1, 1, 1))
+        else:
+            ax.set_aspect('equal', adjustable='datalim')
+            ax.set_axisbelow(True)
+            ax.grid(True)
+
         ax.set_title("Truss Structure: " + subtitle)
+
         if self.output_path is not None:
-            plt.savefig(self.output_path / f"truss_structure_{subtitle.lower().replace(' ', '_')}.png", dpi=600)
+            fig.savefig(self.output_path / f"truss_structure_{subtitle.lower().replace(' ', '_')}.png", dpi=600)
+
         if interactive:
             plt.show()
+
         plt.close(fig)
 
     def get_existent_members_and_involved_nodes(self):
@@ -596,8 +538,8 @@ class TrussStructure(Problem):
 
         # Add load contributions
         for node_id, force in self.loads.items():
-            for a in range(nsd):
-                joint_forces[node_id][a] += force[a]
+            for isd in range(nsd):
+                joint_forces[node_id][isd] += force[isd]
 
         # Add member contributions
         for i_member, member in enumerate(self.members):
@@ -608,12 +550,12 @@ class TrussStructure(Problem):
 
             # Get direction cosines
             dcos_0 = member.direction_cosines_0
-            for a in range(nsd):
-                joint_forces[node_id_0][a] += F * dcos_0[a]
+            for isd in range(nsd):
+                joint_forces[node_id_0][isd] += F * dcos_0[isd]
 
             dcos_1 = member.direction_cosines_1
-            for a in range(nsd):
-                joint_forces[node_id_1][a] += F * dcos_1[a]
+            for isd in range(nsd):
+                joint_forces[node_id_1][isd] += F * dcos_1[isd]
 
         # Sum the squared residual forces over all joints (ignore supports)
         n_loads = len(self.loads)
@@ -631,9 +573,9 @@ class TrussStructure(Problem):
             fixed = (False,) * nsd
             if i_node in self.supports.keys():
                 fixed = self.supports[i_node]
-            for a in range(nsd):
-                if not fixed[a]:
-                    bc_cons.append(joint_forces[i_node][a]/scale)
+            for isd in range(nsd):
+                if not fixed[isd]:
+                    bc_cons.append(joint_forces[i_node][isd]/scale)
 
         return bc_cons
 
