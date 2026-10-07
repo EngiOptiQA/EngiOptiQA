@@ -15,7 +15,7 @@ from engioptiqa.variables.real_number import RealNumber
 from .truss_member import TrussMember
 
 class TrussStructure(Problem):
-    def __init__(self, nsd=2, output_path = None):
+    def __init__(self, output_path = None, nsd=2):
         """
         Class representing a truss structure analysis problem.
 
@@ -24,6 +24,8 @@ class TrussStructure(Problem):
         """
 
         super().__init__(output_path)
+        if nsd not in (2, 3):
+            raise ValueError("nsd must be either 2 or 3.")
         self.nsd = nsd
         self.nodes = {}  # Dictionary to store nodes: {node_id: (x, y) or (x, y, z)}
         self.n_nodes = 0
@@ -265,9 +267,9 @@ class TrussStructure(Problem):
                 lw = max(member.A / A_max * 5, 0.1)
                 label = "Member" if i_member == 0 else None
                 if member in self.optional_members:
-                    ax.plot([x0, x1], [y0, y1], color='gray', linestyle='dashed', lw=1, label=label, zorder=1)
+                    ax.plot([x0, x1], [y0, y1], color='gray', linestyle='dashed', lw=lw, label=label, zorder=1)
                 else:
-                    ax.plot([x0, x1], [y0, y1], color='gray',lw=1, label=label, zorder=1)
+                    ax.plot([x0, x1], [y0, y1], color='gray',lw=lw, label=label, zorder=1)
 
         # Plot loads
         for node_id, (Fx, Fy) in self.loads.items():
@@ -344,8 +346,9 @@ class TrussStructure(Problem):
         for node_id, (Fx, Fy, Fz) in self.loads.items():
             x, y, z = self.nodes[node_id]
             F_norm = (Fx**2 + Fy**2 + Fz**2)**0.5
-            ax.quiver(x, y, z, Fx / (2*F_norm) * d[0], Fy / (2*F_norm) * d[1], Fz / (2*F_norm) * d[2],
-                      color='red', zorder=1)  # Loads as red arrows
+            if F_norm > 0:
+                arrow_length = 0.5 * np.max(d)
+                ax.quiver(x, y, z, Fx / F_norm * arrow_length, Fy / F_norm * arrow_length, Fz / F_norm * arrow_length, color='red', zorder=1)  # Loads as red arrows
 
         # Plot supports
         for node_id, (x_fixed, y_fixed, z_fixed) in self.supports.items():
