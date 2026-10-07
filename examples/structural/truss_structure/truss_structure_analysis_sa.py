@@ -39,12 +39,12 @@ def create_truss_structure_2_elements(ts, A, E, load, visualize=True, subtitle='
 # and vertical load of -100 kN.
 A = 0.5; E = 2e11; load = (0, -100e3)
 
-ts = TrussStructure(output_path=output_path)
+ts = TrussStructure(nsd=2, output_path=output_path)
 create_truss_structure_2_elements(ts, A, E, load, visualize=False, subtitle='Reference')
 
 # Reference Solution
 # ==================
-ts_ref = TrussStructure()
+ts_ref = TrussStructure(nsd=2)
 create_truss_structure_2_elements(ts_ref, A, E, load, visualize=False, subtitle='Reference')
 ts.set_reference_solution(ts_ref)
 
