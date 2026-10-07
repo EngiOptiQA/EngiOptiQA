@@ -3,7 +3,6 @@ class TrussMember:
         self.node_id_0 = node_id_0
         self.node_id_1 = node_id_1
         self.coords = [coords_0, coords_1]
-        self.nsd = len(coords_0)  # number of spatial dimensions (2 or 3)
         self.A = A
         self.A_initial = A
         self.E = E
