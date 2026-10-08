@@ -5,7 +5,7 @@ from pathlib import Path
 
 # Make sure the repo root is on the path
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-from engioptiqa import AnnealingSolverDWave, TrussStructure
+from engioptiqa import AnnealingSolverDWave, AnnealingSolverOpenJij, TrussStructure
 
 # Get the directory containing this script
 script_directory = Path(__file__).resolve().parent
@@ -16,7 +16,29 @@ output_path = results_root / datetime.now().strftime("%Y_%m_%d_%H-%M-%S")
 output_path.mkdir(parents=True, exist_ok=True)
 print(f"Created output folder: {output_path}")
 
-def create_truss_structure_2_elements(ts, A, E, load, visualize=True, subtitle=''):
+
+# Annealing Solvers
+# =================
+
+# Simulated Annealing Solver from D-Wave
+# --------------------------------------
+annealing_solver_sa_dwave = AnnealingSolverDWave()
+annealing_solver_sa_dwave.setup_solver(solver_type='simulated_annealing')
+
+# Simulated Annealing Solver from OpenJij
+# --------------------------------------
+annealing_solver_sa_openjij = AnnealingSolverOpenJij()
+annealing_solver_sa_openjij.setup_solver()
+
+
+########
+## 2D ##
+########
+print("".center(80, "="))
+print("=", f" 2D Truss Structure ".center(76, " "), "=")
+print("".center(80, "="))
+
+def create_2d_truss_structure_2_members(ts, A, E, load, visualize=True, subtitle=''):
     ts.add_node(0, (0,0))  # Node 0 at (0,0)
     ts.add_node(1, (1,0))  # Node 1 at (1,0)
     ts.add_node(2, (0,1))  # Node 2 at (0,1)
@@ -32,7 +54,6 @@ def create_truss_structure_2_elements(ts, A, E, load, visualize=True, subtitle='
     if visualize:
         ts.visualize(subtitle)
 
-
 # The Analysis Problem
 # ====================
 # Define the truss structure with the following cross-sectional area A, Young's modulus E,
@@ -40,12 +61,12 @@ def create_truss_structure_2_elements(ts, A, E, load, visualize=True, subtitle='
 A = 0.5; E = 2e11; load = (0, -100e3)
 
 ts = TrussStructure(nsd=2, output_path=output_path)
-create_truss_structure_2_elements(ts, A, E, load, visualize=False, subtitle='Reference')
+create_2d_truss_structure_2_members(ts, A, E, load, visualize=False)
 
 # Reference Solution
 # ==================
 ts_ref = TrussStructure(nsd=2)
-create_truss_structure_2_elements(ts_ref, A, E, load, visualize=False, subtitle='Reference')
+create_2d_truss_structure_2_members(ts_ref, A, E, load, visualize=False)
 ts.set_reference_solution(ts_ref)
 
 # Numerical Solution
@@ -63,20 +84,14 @@ ts.generate_discretization(n_qubits_per_var=n_qubits_per_var,
 # -----------------------------------------
 penalty_weight = 1e2
 ts.generate_problem_formulation(penalty_weight=penalty_weight)
-coeff_dict = ts.complementary_energy_poly.as_dict()
 
 # Transform Amplify Problem for D-Wave Solver
 # -------------------------------------------
 ts.transform_to_dwave()
 
-# Simulated Annealing Solver from D-Wave
-# --------------------------------------
-annealing_solver_sa = AnnealingSolverDWave()
-annealing_solver_sa.setup_solver(solver_type='simulated_annealing')
-
 # Solve QUBO Problem by Simulated Annealing
 # -----------------------------------------
-annealing_solver_sa.solve_problem(ts, num_reads=50)
+annealing_solver_sa_dwave.solve_problem(ts, num_reads=50)
 
 # Analyze Solution
 # ================
@@ -91,3 +106,81 @@ print('======')
 for i_member, member in enumerate(ts.members):
     print(f'  Member {i_member}')
     print(f'    Rel. Diff: {rel_error_forces[i_member]:.2e}')
+
+########
+## 3D ##
+########
+print("".center(80, "="))
+print("=", f" 3D Truss Structure ".center(76, " "), "=")
+print("".center(80, "="))
+
+def create_3d_truss_structure_4_members(ts, A, E, load, visualize=True, subtitle=''):
+    base_nodes = {
+        0: (0.0, 0.0, 0.0),
+        1: (1.0, 0.0, 0.0),
+        2: (1.0, 1.0, 0.0),
+        3: (0.0, 1.0, 0.0),
+    }
+    for node_id, coordinates in base_nodes.items():
+        ts.add_node(node_id, coordinates)
+    ts.add_node(4, (0.5, 0.5, 1.0))
+
+    # Four sloping bars connect the base to the apex
+    for node_id in base_nodes:
+        ts.add_member(node_id, 4, A=A, E=E)
+
+    # Restrain the base and push the apex in the positive x direction
+    ts.add_support(0, True, True, True)
+    ts.add_support(1, True, True, True)
+    ts.add_support(2, True, True, True)
+    ts.add_support(3, True, True, True)
+    ts.add_load(4, load)
+
+    if visualize:
+        ts.visualize(subtitle)
+
+# The Analysis Problem
+# ====================
+load_3d = (100e3, 0.0, 0.0)
+ts_3d = TrussStructure(nsd=3, output_path=output_path)
+create_3d_truss_structure_4_members(ts_3d, A, E, load_3d, visualize=False)
+
+# Reference Solution
+# ==================
+ts_3d_ref = TrussStructure(nsd=3, output_path=output_path)
+create_3d_truss_structure_4_members(ts_3d_ref, A, E, load_3d, visualize=False)
+ts_3d.set_reference_solution(ts_3d_ref)
+
+# Numerical Solution
+# ==================
+
+# Discretization through Binary Representation of Real-Valued Member Stress
+# -------------------------------------------------------------------------
+binary_representation = 'range'
+n_qubits_per_var = 10
+ts_3d.generate_discretization(n_qubits_per_var=n_qubits_per_var,
+                           binary_representation=binary_representation,
+                           lower_lim=-2.5e5, upper_lim=3e5)
+
+# Problem Formulation Using the Amplify SDK
+# -----------------------------------------
+penalty_weight = 1e2
+ts_3d.generate_problem_formulation(penalty_weight=penalty_weight)
+
+# Solve PUBO Problem by Simulated Annealing
+# -----------------------------------------
+annealing_solver_sa_openjij.solve_problem(ts_3d, num_reads=200, num_threads=12)
+
+# Analyze Solution
+# ================
+best_solution_3d = ts_3d.get_best_solution()
+rel_error_forces_3d, _, rel_error_compliance_3d = ts_3d.compare_with_reference_solution(best_solution_3d)
+
+print('Compliance:')
+print('===========')
+print(f'  Rel. Diff: {rel_error_compliance_3d:.2e}')
+print('Force:')
+print('======')
+for i_member, member in enumerate(ts_3d.members):
+    print(f'  Member {i_member}')
+    print(f'    Rel. Diff: {rel_error_forces_3d[i_member]:.2e}')
