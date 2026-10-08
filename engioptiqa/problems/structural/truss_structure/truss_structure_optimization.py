@@ -130,7 +130,7 @@ class TrussStructureOptimization(TrussStructure):
 
 class TrussStructureOptimizationContinuous(TrussStructureOptimization):
     def __init__(self, nsd, volume_constraint={}, output_path=None):
-        super().__init__(volume_constraint=volume_constraint, nsd=nsd, output_path=output_path)
+        super().__init__(nsd=nsd, volume_constraint=volume_constraint, output_path=output_path)
 
     def get_initial_number_of_problem_variables(self):
         n_existent_members = self.get_number_of_existent_members()
