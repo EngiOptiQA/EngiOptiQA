@@ -54,19 +54,13 @@ class DesignOptimizationProblemRod1D(BaseProblemRod1D):
     def get_initial_number_of_problem_variables(self):
         return self.rod.n_comp * (1 + self.n_qubits_per_var)
 
-    def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
-        BaseProblemRod1D.initialize_discretization(self)
-        BaseProblemRod1D.generate_nodal_force_polys(self, n_qubits_per_var, binary_representation, lower_lim, upper_lim)
-        self.generate_cross_section_inverse_polys()
+    def get_n_design_qubits_per_comp(self):
+        return 1
 
-    def generate_cross_section_inverse_polys(self):
+    def generate_cross_section_inverse_poly(self, i_comp):
         assert(self.variable_generator is not None)
-        cs_inv_polys = []
-
-        for _ in range(self.rod.n_comp):
-            q = self.variable_generator.array("Binary", 1)
-            cs_inv_polys.append(1./self.A_choice[0] + (1./self.A_choice[1]-1./self.A_choice[0])*q[0])
-        self.cs_inv_polys = cs_inv_polys
+        q = self.variable_generator.array("Binary", 1, name=f"q_A_{i_comp}")
+        return 1./self.A_choice[0] + (1./self.A_choice[1]-1./self.A_choice[0])*q[0]
 
     def visualize_qubo_matrix_pattern(self, show_fig=False, save_fig=False, save_tikz=False, suffix=''):
         self.plot_qubo_matrix_pattern()
@@ -83,6 +77,12 @@ class DesignOptimizationProblemRod1D(BaseProblemRod1D):
         plt.close()
 
     def annotate_qubo_matrix_pattern(self):
+        if self.is_interleaved():
+            for i_comp in range(self.rod.n_comp):
+                pos = (i_comp+1)*(self.n_qubits_per_var+1) - 0.5
+                plt.axvline(x=pos, color='gray', linestyle='--', linewidth=0.75)
+                plt.axhline(y=pos, color='gray', linestyle='--', linewidth=0.75)
+            return
         for i_node in range(self.rod.n_comp):
             pos = (i_node+1)*self.n_qubits_per_var - 0.5
             plt.axvline(x=pos, color='gray', linestyle='--', linewidth=0.75)
@@ -97,6 +97,8 @@ class DesignOptimizationProblemRod1D(BaseProblemRod1D):
             highlight_cross_sections = False,
             highlight_interactions = False
         ):
+        if self.is_interleaved():
+            raise NotImplementedError('Sub-pattern visualization assumes blocked variable ordering.')
         self.plot_qubo_matrix_pattern()
         self.annotate_qubo_matrix_pattern()
         plt.xlim(-0.5,((self.rod.n_comp)*(self.n_qubits_per_var+1)-0.5))

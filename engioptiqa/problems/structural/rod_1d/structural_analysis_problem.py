@@ -16,14 +16,6 @@ class StructuralAnalysisProblemRod1D(BaseProblemRod1D):
     def get_initial_number_of_problem_variables(self):
         return self.rod.n_comp * self.n_qubits_per_var
 
-    def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
-        BaseProblemRod1D.initialize_discretization(self)
-        BaseProblemRod1D.generate_nodal_force_polys(self, n_qubits_per_var, binary_representation, lower_lim, upper_lim)
-        self.generate_cross_section_inverse_polys()
-
-    def generate_cross_section_inverse_polys(self):
-        cs_inv_polys = []
-        for _ in range(self.rod.n_comp):
-            cs_inv_polys.append(1./self.rod.A)
-        self.cs_inv_polys = cs_inv_polys
+    def generate_cross_section_inverse_poly(self, i_comp):
+        return 1./self.rod.A
 
