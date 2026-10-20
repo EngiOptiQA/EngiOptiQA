@@ -3,13 +3,13 @@ from amplify import AcceptableDegrees, VariableGenerator
 from dimod import BinaryQuadraticModel as BinaryQuadraticModelDWave
 from dimod.views.samples import SampleView
 from dimod.sampleset import SampleSet
-from engioptiqa.variables import real_number
 import matplot2tikz
 from matplotlib import pyplot as plt
+from matplotlib.colors import LogNorm
+import itertools
 import numpy as np
 from openjij import Response
 import os
-import sys
 
 class Problem(ABC):
     """
@@ -72,12 +72,12 @@ class Problem(ABC):
     # -----------------------------------------------------
     def has_adaptive_variables(self):
         return False
-    
+
     def get_number_of_problem_variables(self):
         if not hasattr(self, 'n_problem_variables'):
             raise RuntimeError("Problem formulation has not been generated yet. Call generate_problem_formulation() first.")
         return self.n_problem_variables
-            
+
     def get_number_of_adaptive_vars(self):
         return 0
 
@@ -150,8 +150,8 @@ class Problem(ABC):
         """
         pass
 
-    # QUBO
-    # ----
+    # QUBO Interactions
+    # -----------------
     def transform_to_dwave(self):
 
         bq = AcceptableDegrees(objective={"Binary": "Quadratic"})
@@ -219,6 +219,52 @@ class Problem(ABC):
                 plt.savefig(file_name, dpi=600)
             if save_tikz:
                 matplot2tikz.save(file_name + '.tex')
+        plt.close()
+
+    # PUBO Interactions
+    # -----------------
+    def get_interaction_sum(self, degrees=(1, 2, 3), weight='count'):
+        """S[i,j] = number (or summed absolute coefficient values) of terms of the PUBO model of the given degrees
+        that contain both i and j."""
+        assert weight in ['count', 'abs'], f"Unknown weight: {weight}"
+        coeff_dict = self.binary_model.objective.asdict()
+        keys = [k for k in coeff_dict if k]
+        if not keys:
+            return None
+        n = max(max(k) for k in keys) + 1
+        S = np.zeros((n, n))
+        for key, value in coeff_dict.items():
+            if len(key) not in degrees or value == 0:
+                continue
+            w = 1.0 if weight == 'count' else abs(value)
+            if len(key) == 1:
+                S[key[0], key[0]] += w
+            else:
+                for i, j in itertools.combinations(key, 2):
+                    S[i, j] += w
+                    S[j, i] += w
+        return S
+
+    def plot_interaction_summary(self, degrees=(1, 2, 3), weight='count', log_scale=False):
+        S = self.get_interaction_sum(degrees, weight)
+        plt.figure()
+        plt.suptitle(self.name + f'\n PUBO Interactions (Degrees {tuple(degrees)}) \n')
+        norm = LogNorm(vmin=S[S > 0].min(), vmax=S.max()) if log_scale else None
+        plt.imshow(np.ma.masked_equal(S, 0), cmap='Blues', interpolation='none', norm=norm)
+        plt.colorbar(label='Number of terms' if weight == 'count' else 'Sum of |coefficients|')
+
+    def visualize_interaction_summary(self, show_fig=False, save_fig=False, save_tikz=False, suffix='',
+                                      degrees=(1, 2, 3), weight='count', log_scale=False):
+        self.plot_interaction_summary(degrees=degrees, weight=weight, log_scale=log_scale)
+        if save_fig or save_tikz:
+            assert(self.output_path is not None)
+            file_name = os.path.join(self.output_path, self.name.lower().replace(' ', '_') + 'pubo_interactions' + suffix)
+            if save_fig:
+                plt.savefig(file_name, dpi=600)
+            if save_tikz:
+                matplot2tikz.save(file_name + '.tex')
+        if show_fig:
+            plt.show()
         plt.close()
 
     # Post-processing of results
