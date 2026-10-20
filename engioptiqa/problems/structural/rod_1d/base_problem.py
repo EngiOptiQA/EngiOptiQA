@@ -159,9 +159,18 @@ class BaseProblemRod1D(Problem):
             return None
 
     def get_position_in_bit_array(self, i_group, i_var):
-        start = i_var * self.n_qubits_per_var
-        end = (i_var + 1) * self.n_qubits_per_var
+        stride = self.n_qubits_per_var
+        if self.is_interleaved():
+            stride += self.get_n_design_qubits_per_comp()
+        start = i_var * stride
+        end = start + self.n_qubits_per_var
         return start, end
+
+    def update_solution(self, i_group, sol_bit_array, sol_encoded):
+        for i_var in range(len(sol_encoded)):
+            start, end = self.get_position_in_bit_array(i_group, i_var)
+            sol_bit_array[start:end] = sol_encoded[i_var]
+        return sol_bit_array
 
     def get_real_number_object(self, i_group):
             return self.real_number
@@ -171,11 +180,35 @@ class BaseProblemRod1D(Problem):
         return self.a_min, self.a_max
 
     def update_formulation(self, best_solution):
-        self.update_nodal_force_polys()
-        self.generate_cross_section_inverse_polys()
+        self.initialize_discretization()
+        if self.variable_ordering == 'blocked':
+            self.generate_nodal_force_polys()
+            self.generate_cross_section_inverse_polys()
+        elif self.variable_ordering == 'interleaved':
+            self.generate_variables()
+        else:
+            raise Exception(f"Unknown variable ordering: {self.variable_ordering}")
 
-    def generate_nodal_force_polys(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
-        assert(self.variable_generator is not None)
+
+    def set_variable_ordering(self, variable_ordering):
+        """
+        Set the ordering of variables in the problem.
+        'blocked': all nodal force variables first, then all design variables.
+        'interleaved': force and design variables are created component by component.
+        """
+        assert variable_ordering in ['blocked', 'interleaved'], \
+            f"Unknown variable ordering: {variable_ordering}"
+        self.variable_ordering = variable_ordering
+
+    def is_interleaved(self):
+        return getattr(self, 'variable_ordering', 'blocked') == 'interleaved'
+
+    def get_n_design_qubits_per_comp(self):
+        return 0
+
+    def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None, variable_ordering='blocked'):
+        self.set_variable_ordering(variable_ordering)
+        self.initialize_discretization()
         if binary_representation in ['range', 'adaptive_range']:
             assert(lower_lim is not None and upper_lim is not None), \
                 "Lower and upper limits must be provided for range representation."
@@ -184,30 +217,46 @@ class BaseProblemRod1D(Problem):
         self.n_qubits_per_var = n_qubits_per_var
         self.binary_representation = binary_representation
         self.real_number = RealNumber(self.n_qubits_per_var, self.binary_representation, lower_lim, upper_lim)
+        if self.variable_ordering == 'blocked':
+            self.generate_nodal_force_polys()
+            self.generate_cross_section_inverse_polys()
+        elif self.variable_ordering == 'interleaved':
+            self.generate_variables()
+        else:
+            raise Exception(f"Unknown variable ordering: {self.variable_ordering}")
 
+    def generate_variables(self):
         nf_polys = []
+        cs_inv_polys = []
         for i_comp in range(self.rod.n_comp):
-            q = self.variable_generator.array("Binary", self.n_qubits_per_var)
-            nf_polys.append(self.real_number.evaluate(q))
+            nf_polys.append(self.generate_nodal_force_poly(i_comp))
+            cs_inv_polys.append(self.generate_cross_section_inverse_poly(i_comp))
             if i_comp == self.rod.n_comp-1:
                 nf_polys.append(0.0)
         self.nf_polys = nf_polys
+        self.cs_inv_polys = cs_inv_polys
 
-    def update_nodal_force_polys(self):
-        self.initialize_discretization()
+    def generate_nodal_force_poly(self, i_comp):
+        assert(self.variable_generator is not None)
+        if self.binary_representation == 'adaptive_range':
+                self.real_number.set_range(self.a_min[i_comp], self.a_max[i_comp])
+        q_force  = self.variable_generator.array("Binary", self.n_qubits_per_var, name=f"q_F_{i_comp}")
+        return self.real_number.evaluate(q_force)
+
+    def generate_nodal_force_polys(self):
         nf_polys = []
         for i_comp in range(self.rod.n_comp):
-            q = self.variable_generator.array("Binary", self.n_qubits_per_var)
-            if self.binary_representation == 'adaptive_range':
-                self.real_number.set_range(self.a_min[i_comp], self.a_max[i_comp])
-            nf_polys.append(self.real_number.evaluate(q))
+            nf_polys.append(self.generate_nodal_force_poly(i_comp))
             if i_comp == self.rod.n_comp-1:
                 nf_polys.append(0.0)
         self.nf_polys = nf_polys
 
     @abstractmethod
-    def generate_cross_section_inverse_polys(self):
+    def generate_cross_section_inverse_poly(self):
         pass
+
+    def generate_cross_section_inverse_polys(self):
+        self.cs_inv_polys = [self.generate_cross_section_inverse_poly(i_comp) for i_comp in range(self.rod.n_comp)]
 
     def print_discretization(self):
         for i_comp in range(self.rod.n_comp):
