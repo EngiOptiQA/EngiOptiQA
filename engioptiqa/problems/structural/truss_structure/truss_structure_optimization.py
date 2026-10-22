@@ -4,8 +4,8 @@ from engioptiqa.variables.real_number import RealNumber
 from .truss_structure import TrussStructure
 
 class TrussStructureOptimization(TrussStructure):
-    def __init__(self, nsd, volume_constraint = {}, output_path=None):
-        super().__init__(nsd=nsd, output_path=output_path)
+    def __init__(self, nsd, method, volume_constraint = {}, output_path=None):
+        super().__init__(nsd=nsd, output_path=output_path, method=method)
         self.volume_constraint = volume_constraint
         if volume_constraint['mode'] == 'direct':
              self.target_volume = volume_constraint.get('target', None)
@@ -21,11 +21,11 @@ class TrussStructureOptimization(TrussStructure):
         return n_problem_variables
 
     def generate_discretization(self,
-                                n_qubits_per_var, binary_representation_stress,
-                                lower_lim_stress=None, upper_lim_stress=None,
+                                n_qubits_per_var, binary_representation_state,
+                                lower_lim_state=None, upper_lim_state=None,
                                 n_qubits_slack=3):
         self.initialize_discretization()
-        self.generate_member_stress_polys(n_qubits_per_var, binary_representation_stress, lower_lim_stress, upper_lim_stress)
+        self.generate_member_state_polys(n_qubits_per_var, binary_representation_state, lower_lim_state, upper_lim_state)
         self.generate_member_area_polys()
         if self.volume_constraint['type'] == 'ineq':
             self.n_qubits_slack = n_qubits_slack
@@ -93,15 +93,38 @@ class TrussStructureOptimization(TrussStructure):
             else:
                 raise Exception("Number of additional members must be set and be greater than zero.")
 
+    def residual_constraints(self, member_states, member_areas):
+        # Force formulation: an absent optional member must not carry any force.
+        scale = self.get_load_scale()
+        res_cons = []
+        res_cons_squared = 0.0
+        for i_member, member in enumerate(self.members):
+            if member in self.optional_members:
+                alpha = member_areas[i_member] / member.A
+                N = member_states[i_member]
+                res_cons.append((1 - alpha) * N / scale)
+                res_cons_squared += (1 - alpha) * (N / scale)**2
+        return res_cons, res_cons_squared
+
+    def generate_residual_constraint_poly(self):
+        member_states = self.member_state_polys
+        member_areas = self.member_area_polys
+        res_cons, res_cons_squared = self.residual_constraints(member_states, member_areas)
+        self.residual_con_poly = res_cons
+        self.residual_con_squared_poly = res_cons_squared
 
     def generate_constraint_polys(self):
         self.generate_joint_residuals_poly()
         self.generate_volume_constraint_poly()
         self.constraint_polys = self.joint_residual_polys + self.volume_con_poly
         self.constraints_sum_squared_poly = self.joint_residuals_squared_sum_poly + self.volume_con_squared_poly
+        if self.method == 'forces':
+            self.generate_residual_constraint_poly()
+            self.constraint_polys += self.residual_con_poly
+            self.constraints_sum_squared_poly += self.residual_con_squared_poly
 
     def get_n_constraints(self):
-        return super().get_n_constraints() + 1
+        return super().get_n_constraints() + 1 + (self.method == 'forces') * self.n_optional_members
 
     def generate_problem_formulation(self, penalty_weight=1.0, lagrange_multipliers=[], mode='penalty'):
         super().generate_complementary_energy_poly()
@@ -123,14 +146,16 @@ class TrussStructureOptimization(TrussStructure):
         self.print_and_log(output)
 
     def update_formulation(self, best_solution=None):
-        self.update_member_stress_polys()
+        self.update_member_state_polys()
         self.generate_member_area_polys()
         if self.volume_constraint['type'] == 'ineq':
             self.generate_slack_variable()
 
 class TrussStructureOptimizationContinuous(TrussStructureOptimization):
-    def __init__(self, nsd, volume_constraint={}, output_path=None):
-        super().__init__(nsd=nsd, volume_constraint=volume_constraint, output_path=output_path)
+    def __init__(self, nsd, volume_constraint={}, output_path=None, method='stresses'):
+        if method == 'forces':
+            raise NotImplementedError("The force formulation is not available for continuous member areas.")
+        super().__init__(nsd=nsd, volume_constraint=volume_constraint, output_path=output_path, method=method)
 
     def get_initial_number_of_problem_variables(self):
         n_existent_members = self.get_number_of_existent_members()
@@ -142,13 +167,13 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
         return n_problem_variables
 
     def generate_discretization(self,
-                                n_qubits_per_var, binary_representation_stress,
+                                n_qubits_per_var, binary_representation_state,
                                 n_qubits_per_area, binary_representation_area,
-                                lower_lim_stress=None, upper_lim_stress=None,
+                                lower_lim_state=None, upper_lim_state=None,
                                 lower_lim_area=None, upper_lim_area=None,
                                 n_qubits_slack=3):
         self.initialize_discretization()
-        self.generate_member_stress_polys(n_qubits_per_var, binary_representation_stress, lower_lim_stress, upper_lim_stress)
+        self.generate_member_state_polys(n_qubits_per_var, binary_representation_state, lower_lim_state, upper_lim_state)
         self.generate_member_area_polys(n_qubits_per_area, binary_representation_area, lower_lim_area, upper_lim_area)
         if self.volume_constraint['type'] == 'ineq':
             self.n_qubits_slack = n_qubits_slack
@@ -166,12 +191,12 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
         else:
             return np.array([0])
 
-    def get_adaptive_vars(self, member_stresses_sol, member_areas_sol):
+    def get_adaptive_vars(self, member_states_sol, member_areas_sol):
         if self.binary_representation == 'adaptive_range':
             if self.binary_representation_area == 'adaptive_range':
-                return [member_stresses_sol, member_areas_sol]
+                return [member_states_sol, member_areas_sol]
             else:
-                return [member_stresses_sol]
+                return [member_states_sol]
         else:
             return None
 
@@ -216,7 +241,7 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
             return None, None
 
     def update_formulation(self, best_solution):
-        self.update_member_stress_polys()
+        self.update_member_state_polys()
         self.update_member_area_polys(best_solution)
         if self.volume_constraint['type'] == 'ineq':
             self.generate_slack_variable()
