@@ -15,16 +15,16 @@ from engioptiqa.variables.real_number import RealNumber
 from .truss_member import TrussMember
 
 class TrussStructure(Problem):
-    def __init__(self, nsd, method, output_path = None):
+    def __init__(self, nsd, formulation, output_path = None):
         """
         Class representing a truss structure analysis problem.
 
         :param nsd: Number of spatial dimensions (2 for 2D, 3 for 3D truss structures).
         :param output_path: Optional path for saving results.
-        :param method: Formulation used to treat the truss structure problem: 'stresses' or 'forces'.
+        :param formulation: Formulation used to treat the truss structure problem: 'stress' or 'force'.
         """
 
-        super().__init__(output_path )
+        super().__init__(output_path)
         if nsd not in (2, 3):
             raise ValueError("nsd must be either 2 or 3.")
         self.nsd = nsd
@@ -38,7 +38,7 @@ class TrussStructure(Problem):
         self.supports = {}  # Dictionary to store support conditions: {node_id: (x_fixed, y_fixed) or (x_fixed, y_fixed, z_fixed)}
 
         self.penalty_weight = 0.0
-        self.method = method
+        self.formulation = formulation
 
     def capabilities(self):
         return super().capabilities() | {"outeropt_penalty", "outeropt_augmented_lagrangian"}
@@ -506,20 +506,23 @@ class TrussStructure(Problem):
             member_area_polys.append(member.A)
         self.member_area_polys = member_area_polys
 
+    def compute_alpha(self, A, A_tilde):
+        # Compute the ratio of the current area to the reference area.
+        return 1
+
     def complementary_energy(self, member_states, member_areas):
         U = []
         for i_member, member in enumerate(self.members):
             A = member_areas[i_member]
             L = member.length
             E = member.E
-            if self.method == 'stresses':
+            if self.formulation == 'stress':
                 stress = member_states[i_member]
                 U.append(stress**2* A * L / (2*E))
-            elif self.method == 'forces':
+            elif self.formulation == 'force':
                 force = member_states[i_member]
-                A_tilde = member.A
-                alpha = A / A_tilde
-                U.append(force**2* L / (2*E*A_tilde) * alpha)
+                alpha = self.compute_alpha(A, member.A)
+                U.append(force**2* L / (2*E*member.A) * alpha)
         V = [0 for _ in range(len(self.members))]
         # Total Complementary Energy.
         PI = sum(U + V)
@@ -566,9 +569,9 @@ class TrussStructure(Problem):
             node_id_0 = member.node_id_0
             node_id_1 = member.node_id_1
 
-            if self.method == 'stresses':
+            if self.formulation == 'stress':
                 F = member_states[i_member] * member_areas[i_member]
-            elif self.method == 'forces':
+            elif self.formulation == 'force':
                 F = member_states[i_member]
 
             # Get direction cosines
@@ -660,10 +663,10 @@ class TrussStructure(Problem):
         member_states_sol = self.decode_member_state_solution(result)
         member_areas_sol = self.decode_member_area_solution(result)
         # Compute member forces and stresses, complementary energy, and volume.
-        if self.method == 'stresses':
+        if self.formulation == 'stress':
             member_stresses_sol = member_states_sol
             member_forces_sol = [member_states_sol[i]*member_areas_sol[i] for i in range(len(member_states_sol))]
-        elif self.method == 'forces':
+        elif self.formulation == 'force':
             member_forces_sol = member_states_sol
             member_stresses_sol = [member_states_sol[i]/member_areas_sol[i] if member_areas_sol[i] > 0 else 0.0
                                    for i in range(len(member_states_sol))]
@@ -692,11 +695,11 @@ class TrussStructure(Problem):
                     volume_residual_sol = res_max_members
             constraints_sol.extend([volume_residual_sol])
         volume_residual_squared_sol = volume_residual_sol**2
-        residual_squared_sum_sol = 0.0
-        if self.method == 'forces' and hasattr(self, 'residual_constraints'):
-            residual_cons_sol, residual_squared_sum_sol = self.residual_constraints(member_states_sol, member_areas_sol)
-            constraints_sol.extend(residual_cons_sol)
-        constraints_squared_sum_sol = joint_residuals_squared_sum_sol + volume_residual_squared_sol + residual_squared_sum_sol
+        force_residual_squared_sum_sol = 0.0
+        if self.formulation == 'force' and hasattr(self, 'residual_constraints'):
+            force_residual_sol, force_residual_squared_sum_sol = self.force_residuals(member_states_sol, member_areas_sol)
+            constraints_sol.extend(force_residual_sol)
+        constraints_squared_sum_sol = joint_residuals_squared_sum_sol + volume_residual_squared_sol + force_residual_squared_sum_sol
         # Compute objective function.
         objective_sol = self.objective(complementary_energy_sol, constraints_squared_sum_sol, constraints_sol)
 
@@ -709,7 +712,7 @@ class TrussStructure(Problem):
             'volume': volume_sol,
             'volume_residual_squared': volume_residual_squared_sol,
             'joint_residuals_squared_sum': joint_residuals_squared_sum_sol,
-            'residual_squared_sum': residual_squared_sum_sol,
+            'force_residual_squared_sum': force_residual_squared_sum_sol,
             'constraints': constraints_sol,
             'constraints_squared_sum': constraints_squared_sum_sol,
             'objective': objective_sol
@@ -765,8 +768,8 @@ class TrussStructure(Problem):
         output += f"Constraints (squared sum): {best_solution['constraints_squared_sum']}\n"
         output += f"\tJoint Residuals (squared): {best_solution['joint_residuals_squared_sum']}\n"
         output += f"\tVolume residual (squared): {best_solution['volume_residual_squared']}\n"
-        if self.method == 'forces':
-            output += f"\tAbsent member forces (squared): {best_solution['residual_squared_sum']}\n"
+        if self.formulation == 'force':
+            output += f"\tAbsent member forces (squared): {best_solution['force_residual_squared_sum']}\n"
         output += f"Member Forces: {best_solution['member_forces']}\n"
         output += f"Member Stresses: {best_solution['member_stresses']}\n"
         output += f"Member Areas: {best_solution['member_areas']}\n"

@@ -60,12 +60,12 @@ def create_2d_truss_structure_2_members(ts, A, E, load, visualize=True, subtitle
 # and vertical load of -100 kN.
 A = 0.5; E = 2e11; load = (0, -100e3)
 
-ts = TrussStructure(nsd=2, output_path=output_path, method='stresses')
+ts = TrussStructure(nsd=2, formulation='stress', output_path=output_path)
 create_2d_truss_structure_2_members(ts, A, E, load, visualize=False)
 
 # Reference Solution
 # ==================
-ts_ref = TrussStructure(nsd=2, method='stresses')
+ts_ref = TrussStructure(nsd=2, formulation='stress')
 create_2d_truss_structure_2_members(ts_ref, A, E, load, visualize=False)
 ts.set_reference_solution(ts_ref)
 
@@ -142,12 +142,12 @@ def create_3d_truss_structure_4_members(ts, A, E, load, visualize=True, subtitle
 # The Analysis Problem
 # ====================
 load_3d = (100e3, 0.0, 0.0)
-ts_3d = TrussStructure(nsd=3, output_path=output_path, method='stresses')
+ts_3d = TrussStructure(nsd=3, formulation='stress', output_path=output_path)
 create_3d_truss_structure_4_members(ts_3d, A, E, load_3d, visualize=False)
 
 # Reference Solution
 # ==================
-ts_3d_ref = TrussStructure(nsd=3, output_path=output_path, method='stresses')
+ts_3d_ref = TrussStructure(nsd=3, formulation='stress', output_path=output_path)
 create_3d_truss_structure_4_members(ts_3d_ref, A, E, load_3d, visualize=False)
 ts_3d.set_reference_solution(ts_3d_ref)
 
