@@ -240,7 +240,7 @@ class BaseProblemRod1D(Problem):
         assert(self.variable_generator is not None)
         if self.binary_representation == 'adaptive_range':
                 self.real_number.set_range(self.a_min[i_comp], self.a_max[i_comp])
-        q_force  = self.variable_generator.array("Binary", self.n_qubits_per_var, name=f"q_F_{i_comp}")
+        q_force  = self.variable_generator.array("Binary", self.n_qubits_per_var, name=f"a^{i_comp}")
         return self.real_number.evaluate(q_force)
 
     def generate_nodal_force_polys(self):
