@@ -84,6 +84,9 @@ class TrussStructure(Problem):
 
         :param member_areas: List of areas corresponding to each member.
         """
+        if min(member_areas) < 1e-12:
+            raise ValueError("Cross-sectional areas must be non-negative.")
+
         if len(member_areas) != self.n_members:
             raise ValueError("Length of areas list must match the number of members.")
 
