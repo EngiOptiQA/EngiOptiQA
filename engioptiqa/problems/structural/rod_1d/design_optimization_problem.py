@@ -59,8 +59,8 @@ class DesignOptimizationProblemRod1D(BaseProblemRod1D):
 
     def generate_cross_section_inverse_poly(self, i_comp):
         assert(self.variable_generator is not None)
-        q = self.variable_generator.array("Binary", 1, name=f"q_A_{i_comp}")
-        return 1./self.A_choice[0] + (1./self.A_choice[1]-1./self.A_choice[0])*q[0]
+        q_A = self.variable_generator.scalar("Binary", name=f"A^{i_comp}")
+        return 1./self.A_choice[0] + (1./self.A_choice[1]-1./self.A_choice[0])*q_A
 
     def visualize_qubo_matrix_pattern(self, show_fig=False, save_fig=False, save_tikz=False, suffix=''):
         self.plot_qubo_matrix_pattern()
