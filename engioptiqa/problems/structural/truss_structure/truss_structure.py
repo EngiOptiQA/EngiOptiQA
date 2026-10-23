@@ -15,12 +15,13 @@ from engioptiqa.variables.real_number import RealNumber
 from .truss_member import TrussMember
 
 class TrussStructure(Problem):
-    def __init__(self, nsd, output_path = None):
+    def __init__(self, nsd, formulation, output_path = None):
         """
         Class representing a truss structure analysis problem.
 
         :param nsd: Number of spatial dimensions (2 for 2D, 3 for 3D truss structures).
         :param output_path: Optional path for saving results.
+        :param formulation: Formulation used to treat the truss structure problem: 'stress' or 'force'.
         """
 
         super().__init__(output_path)
@@ -37,6 +38,7 @@ class TrussStructure(Problem):
         self.supports = {}  # Dictionary to store support conditions: {node_id: (x_fixed, y_fixed) or (x_fixed, y_fixed, z_fixed)}
 
         self.penalty_weight = 0.0
+        self.formulation = formulation
 
     def capabilities(self):
         return super().capabilities() | {"outeropt_penalty", "outeropt_augmented_lagrangian"}
@@ -82,6 +84,7 @@ class TrussStructure(Problem):
 
         :param member_areas: List of areas corresponding to each member.
         """
+
         if len(member_areas) != self.n_members:
             raise ValueError("Length of areas list must match the number of members.")
 
@@ -431,7 +434,7 @@ class TrussStructure(Problem):
 
     def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
         self.initialize_discretization()
-        self.generate_member_stress_polys(n_qubits_per_var, binary_representation, lower_lim, upper_lim)
+        self.generate_member_state_polys(n_qubits_per_var, binary_representation, lower_lim, upper_lim)
         self.generate_member_area_polys()
 
     def has_adaptive_variables(self):
@@ -443,9 +446,9 @@ class TrussStructure(Problem):
         else:
             return np.array([0])
 
-    def get_adaptive_vars(self, member_stresses_sol, member_areas_sol):
+    def get_adaptive_vars(self, member_states_sol, member_areas_sol):
         if self.binary_representation == 'adaptive_range':
-            return [member_stresses_sol]
+            return [member_states_sol]
         else:
             return None
 
@@ -465,10 +468,10 @@ class TrussStructure(Problem):
             return None, None
 
     def update_formulation(self, best_solution=None):
-        self.update_member_stress_polys()
+        self.update_member_state_polys()
         self.generate_member_area_polys()
 
-    def generate_member_stress_polys(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
+    def generate_member_state_polys(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
         assert(self.variable_generator is not None)
         if binary_representation in ['range', 'adaptive_range']:
             assert(lower_lim is not None and upper_lim is not None), \
@@ -479,21 +482,21 @@ class TrussStructure(Problem):
         self.binary_representation = binary_representation
         self.real_number = RealNumber(self.n_qubits_per_var, self.binary_representation, lower_lim, upper_lim)
 
-        member_stress_polys = []
+        member_state_polys = []
         for i_member, _ in enumerate(self.members):
             q = self.variable_generator.array("Binary", self.n_qubits_per_var, name=f"q_S_{i_member}")
-            member_stress_polys.append(self.real_number.evaluate(q))
-        self.member_stress_polys = member_stress_polys
+            member_state_polys.append(self.real_number.evaluate(q))
+        self.member_state_polys = member_state_polys
 
-    def update_member_stress_polys(self):
+    def update_member_state_polys(self):
         self.initialize_discretization()
-        member_stress_polys = []
+        member_state_polys = []
         for i_member, _ in enumerate(self.members):
             q = self.variable_generator.array("Binary", self.n_qubits_per_var, name=f"q_S_{i_member}")
             if self.binary_representation == 'adaptive_range':
                 self.real_number.set_range(self.a_min[i_member], self.a_max[i_member])
-            member_stress_polys.append(self.real_number.evaluate(q))
-        self.member_stress_polys = member_stress_polys
+            member_state_polys.append(self.real_number.evaluate(q))
+        self.member_state_polys = member_state_polys
 
     def generate_member_area_polys(self):
         member_area_polys = []
@@ -501,23 +504,32 @@ class TrussStructure(Problem):
             member_area_polys.append(member.A)
         self.member_area_polys = member_area_polys
 
-    def complementary_energy(self, member_stresses, member_areas):
+    def compute_alpha(self, A, A_tilde):
+        # Compute the ratio of the current area to the reference area.
+        return 1
+
+    def complementary_energy(self, member_states, member_areas):
         U = []
         for i_member, member in enumerate(self.members):
             A = member_areas[i_member]
             L = member.length
             E = member.E
-            stress = member_stresses[i_member]
-            U.append(stress**2* A * L / (2*E))
+            if self.formulation == 'stress':
+                stress = member_states[i_member]
+                U.append(stress**2* A * L / (2*E))
+            elif self.formulation == 'force':
+                force = member_states[i_member]
+                alpha = self.compute_alpha(A, member.A)
+                U.append(force**2* L / (2*E*member.A) * alpha)
         V = [0 for _ in range(len(self.members))]
         # Total Complementary Energy.
         PI = sum(U + V)
         return PI
 
     def generate_complementary_energy_poly(self):
-        member_stresses = self.member_stress_polys
+        member_states = self.member_state_polys
         member_areas = self.member_area_polys
-        PI_poly = self.complementary_energy(member_stresses, member_areas)
+        PI_poly = self.complementary_energy(member_states, member_areas)
         self.complementary_energy_poly = PI_poly
 
     def total_volume(self, member_areas):
@@ -528,7 +540,16 @@ class TrussStructure(Problem):
             total_volume += A * L
         return total_volume
 
-    def joint_residuals(self, member_stresses, member_areas):
+    def get_load_scale(self):
+        n_loads = len(self.loads)
+        if n_loads == 0:
+            raise Exception('No loads specified.')
+        total_mag = 0.0
+        for force in self.loads.values():
+            total_mag += np.sqrt(sum(f**2 for f in force))
+        return total_mag/n_loads
+
+    def joint_residuals(self, member_states, member_areas):
 
         # Equilibrium (automatically fulfilled without body forces)
 
@@ -546,7 +567,10 @@ class TrussStructure(Problem):
             node_id_0 = member.node_id_0
             node_id_1 = member.node_id_1
 
-            F = member_stresses[i_member] * member_areas[i_member]
+            if self.formulation == 'stress':
+                F = member_states[i_member] * member_areas[i_member]
+            elif self.formulation == 'force':
+                F = member_states[i_member]
 
             # Get direction cosines
             dcos_0 = member.direction_cosines_0
@@ -557,15 +581,7 @@ class TrussStructure(Problem):
             for isd in range(nsd):
                 joint_forces[node_id_1][isd] += F * dcos_1[isd]
 
-        # Sum the squared residual forces over all joints (ignore supports)
-        n_loads = len(self.loads)
-        if n_loads > 0:
-            total_mag = 0.0
-            for force in self.loads.values():
-                total_mag += np.sqrt(sum(f**2 for f in force))
-            scale = total_mag/n_loads
-        else:
-            raise Exception('No loads specified.')
+        scale = self.get_load_scale()
 
         bc_cons = []
 
@@ -579,9 +595,9 @@ class TrussStructure(Problem):
 
         return bc_cons
 
-    def joint_residuals_squared_sum(self, member_stresses, member_areas):
+    def joint_residuals_squared_sum(self, member_states, member_areas):
 
-        bc_cons = self.joint_residuals(member_stresses, member_areas)
+        bc_cons = self.joint_residuals(member_states, member_areas)
 
         bc_cons_poly = 0.0
         for bc_con in bc_cons:
@@ -589,10 +605,10 @@ class TrussStructure(Problem):
         return bc_cons, bc_cons_poly
 
     def generate_joint_residuals_poly(self):
-        member_stresses = self.member_stress_polys
+        member_states = self.member_state_polys
         member_areas = self.member_area_polys
 
-        bc_cons, bc_cons_sq_sum = self.joint_residuals_squared_sum(member_stresses, member_areas)
+        bc_cons, bc_cons_sq_sum = self.joint_residuals_squared_sum(member_states, member_areas)
         self.joint_residuals_squared_sum_poly = bc_cons_sq_sum
         self.joint_residual_polys = bc_cons
 
@@ -641,15 +657,21 @@ class TrussStructure(Problem):
 
     def evaluate_result(self, result):
 
-        # Decode solution, i.e., evaluate nodal stress and member areas.
-        member_stresses_sol = self.decode_member_stress_solution(result)
+        # Decoded member state variables: stresses or forces.
+        member_states_sol = self.decode_member_state_solution(result)
         member_areas_sol = self.decode_member_area_solution(result)
-        # Compute member forces, complementary energy, and volume.
-        member_forces_sol = [member_stresses_sol[i]*member_areas_sol[i] for i in range(len(member_stresses_sol))]
-        complementary_energy_sol = self.complementary_energy(member_stresses_sol, member_areas_sol)
+        # Compute member forces and stresses, complementary energy, and volume.
+        if self.formulation == 'stress':
+            member_stresses_sol = member_states_sol
+            member_forces_sol = [member_states_sol[i]*member_areas_sol[i] for i in range(len(member_states_sol))]
+        elif self.formulation == 'force':
+            member_forces_sol = member_states_sol
+            member_stresses_sol = [member_states_sol[i]/member_areas_sol[i] if member_areas_sol[i] > 0 else 0.0
+                                   for i in range(len(member_states_sol))]
+        complementary_energy_sol = self.complementary_energy(member_states_sol, member_areas_sol)
         volume_sol = self.total_volume(member_areas_sol)
         # Evaluate constraints (joint residuals and volume constraint, if any).
-        joint_residuals_sol, joint_residuals_squared_sum_sol = self.joint_residuals_squared_sum(member_stresses_sol, member_areas_sol)
+        joint_residuals_sol, joint_residuals_squared_sum_sol = self.joint_residuals_squared_sum(member_states_sol, member_areas_sol)
         constraints_sol = joint_residuals_sol
         volume_residual_sol= 0.0
         if hasattr(self, 'volume_constraint'):
@@ -671,7 +693,11 @@ class TrussStructure(Problem):
                     volume_residual_sol = res_max_members
             constraints_sol.extend([volume_residual_sol])
         volume_residual_squared_sol = volume_residual_sol**2
-        constraints_squared_sum_sol = joint_residuals_squared_sum_sol + volume_residual_squared_sol
+        force_residual_squared_sum_sol = 0.0
+        if self.formulation == 'force' and hasattr(self, 'force_residual_poly'):
+            force_residual_sol, force_residual_squared_sum_sol = self.force_residuals(member_states_sol, member_areas_sol)
+            constraints_sol.extend(force_residual_sol)
+        constraints_squared_sum_sol = joint_residuals_squared_sum_sol + volume_residual_squared_sol + force_residual_squared_sum_sol
         # Compute objective function.
         objective_sol = self.objective(complementary_energy_sol, constraints_squared_sum_sol, constraints_sol)
 
@@ -679,11 +705,12 @@ class TrussStructure(Problem):
             'member_forces': member_forces_sol,
             'member_stresses': member_stresses_sol,
             'member_areas': member_areas_sol,
-            'adaptive_vars': self.get_adaptive_vars(member_stresses_sol, member_areas_sol),
+            'adaptive_vars': self.get_adaptive_vars(member_states_sol, member_areas_sol),
             'complementary_energy': complementary_energy_sol,
             'volume': volume_sol,
             'volume_residual_squared': volume_residual_squared_sol,
             'joint_residuals_squared_sum': joint_residuals_squared_sum_sol,
+            'force_residual_squared_sum': force_residual_squared_sum_sol,
             'constraints': constraints_sol,
             'constraints_squared_sum': constraints_squared_sum_sol,
             'objective': objective_sol
@@ -739,6 +766,8 @@ class TrussStructure(Problem):
         output += f"Constraints (squared sum): {best_solution['constraints_squared_sum']}\n"
         output += f"\tJoint Residuals (squared): {best_solution['joint_residuals_squared_sum']}\n"
         output += f"\tVolume residual (squared): {best_solution['volume_residual_squared']}\n"
+        if self.formulation == 'force' and hasattr(self, 'force_residual_poly'):
+            output += f"\tAbsent member forces (squared): {best_solution['force_residual_squared_sum']}\n"
         output += f"Member Forces: {best_solution['member_forces']}\n"
         output += f"Member Stresses: {best_solution['member_stresses']}\n"
         output += f"Member Areas: {best_solution['member_areas']}\n"
@@ -751,18 +780,18 @@ class TrussStructure(Problem):
 
         return best_solution
 
-    def decode_member_stress_solution(self, result):
-        member_stress_sol = []
-        for i_member, member_stress_poly in enumerate(self.member_stress_polys):
+    def decode_member_state_solution(self, result):
+        member_state_sol = []
+        for i_member, member_state_poly in enumerate(self.member_state_polys):
             if not self.members[i_member].exists:
-                member_stress_sol.append(0.)
+                member_state_sol.append(0.)
             elif type(result) is SampleView:
-                member_stress_sol.append(self.decode_amplify_poly_with_bitstring(member_stress_poly,result._data))
+                member_state_sol.append(self.decode_amplify_poly_with_bitstring(member_state_poly,result._data))
             elif type(result) is SimpleNamespace:
-                member_stress_sol.append(self.decode_amplify_poly_with_bitstring(member_stress_poly,result.values))
+                member_state_sol.append(self.decode_amplify_poly_with_bitstring(member_state_poly,result.values))
             else:
-                member_stress_sol.append(member_stress_poly.decode(result.values))
-        return member_stress_sol
+                member_state_sol.append(member_state_poly.decode(result.values))
+        return member_state_sol
 
     def decode_member_area_solution(self, result):
         member_area_sol = []
