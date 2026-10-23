@@ -696,7 +696,7 @@ class TrussStructure(Problem):
             constraints_sol.extend([volume_residual_sol])
         volume_residual_squared_sol = volume_residual_sol**2
         force_residual_squared_sum_sol = 0.0
-        if self.formulation == 'force' and hasattr(self, 'residual_constraints'):
+        if self.formulation == 'force' and hasattr(self, 'force_residual_poly'):
             force_residual_sol, force_residual_squared_sum_sol = self.force_residuals(member_states_sol, member_areas_sol)
             constraints_sol.extend(force_residual_sol)
         constraints_squared_sum_sol = joint_residuals_squared_sum_sol + volume_residual_squared_sol + force_residual_squared_sum_sol
@@ -768,7 +768,7 @@ class TrussStructure(Problem):
         output += f"Constraints (squared sum): {best_solution['constraints_squared_sum']}\n"
         output += f"\tJoint Residuals (squared): {best_solution['joint_residuals_squared_sum']}\n"
         output += f"\tVolume residual (squared): {best_solution['volume_residual_squared']}\n"
-        if self.formulation == 'force':
+        if self.formulation == 'force' and hasattr(self, 'force_residual_poly'):
             output += f"\tAbsent member forces (squared): {best_solution['force_residual_squared_sum']}\n"
         output += f"Member Forces: {best_solution['member_forces']}\n"
         output += f"Member Stresses: {best_solution['member_stresses']}\n"

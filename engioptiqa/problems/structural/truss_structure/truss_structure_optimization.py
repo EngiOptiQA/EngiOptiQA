@@ -114,21 +114,21 @@ class TrussStructureOptimization(TrussStructure):
         member_states = self.member_state_polys
         member_areas = self.member_area_polys
         force_res, force_res_squared = self.force_residuals(member_states, member_areas)
-        self.residual_con_poly = force_res
-        self.residual_con_squared_poly = force_res_squared
+        self.force_residual_poly = force_res
+        self.force_residual_squared_poly = force_res_squared
 
     def generate_constraint_polys(self):
         self.generate_joint_residuals_poly()
         self.generate_volume_constraint_poly()
         self.constraint_polys = self.joint_residual_polys + self.volume_con_poly
         self.constraints_sum_squared_poly = self.joint_residuals_squared_sum_poly + self.volume_con_squared_poly
-        if self.formulation == 'forces':
+        if self.formulation == 'force' :
             self.generate_force_residuals_poly()
-            self.constraint_polys += self.residual_con_poly
-            self.constraints_sum_squared_poly += self.residual_con_squared_poly
+            self.constraint_polys += self.force_residual_poly
+            self.constraints_sum_squared_poly += self.force_residual_squared_poly
 
     def get_n_constraints(self):
-        return super().get_n_constraints() + 1 + (self.formulation == 'forces') * self.n_optional_members
+        return super().get_n_constraints() + 1 + (self.formulation == 'force') * self.n_optional_members
 
     def generate_problem_formulation(self, penalty_weight=1.0, lagrange_multipliers=[], mode='penalty'):
         super().generate_complementary_energy_poly()
@@ -156,10 +156,10 @@ class TrussStructureOptimization(TrussStructure):
             self.generate_slack_variable()
 
 class TrussStructureOptimizationContinuous(TrussStructureOptimization):
-    def __init__(self, nsd, volume_constraint={}, output_path=None, formulation='stresses'):
-        if formulation == 'forces':
+    def __init__(self, nsd, formulation='stress', volume_constraint={}, output_path=None):
+        if formulation == 'force':
             raise NotImplementedError("The force formulation is not available for continuous member areas.")
-        super().__init__(nsd=nsd, volume_constraint=volume_constraint, output_path=output_path, formulation=formulation)
+        super().__init__(nsd=nsd, formulation=formulation,volume_constraint=volume_constraint, output_path=output_path)
 
     def get_initial_number_of_problem_variables(self):
         n_existent_members = self.get_number_of_existent_members()
