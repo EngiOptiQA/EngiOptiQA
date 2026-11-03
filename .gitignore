@@ -10,3 +10,5 @@ dist/
 examples/**/results/
 **/playground/
 
+# IDE files
+.idea/
