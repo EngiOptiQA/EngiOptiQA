@@ -5,7 +5,7 @@ and Matthias Moller (m.moller@tudelft.nl)
 
 # Power Flow
 
-This problem solves the AC power-flow equations in rectangular voltage
+This problem solves the AC power flow equations in rectangular voltage
 coordinates and encodes the residual as a polynomial objective so that
 EngiOptiQA can dispatch it to an annealing back-end (D-Wave Ocean,
 OpenJij, Amplify).
@@ -147,13 +147,18 @@ point (|V|≈1.04, |V|≈1.01 at the two PV buses, ±9° angle spread).
 
 From the repository root:
 
+For one-shot optimization:
 ```powershell
-python examples/powerflow/powerflow_4bus.py --bus 4 --bits 6 --num-reads 200
+python examples/powerflow/powerflow_4bus.py --bus 4 --bits 6 --num-reads 5000
+```
+For iterative optimization:
+```powershell
+python examples/powerflow/powerflow_4bus.py --bus 4 --mode iterative --num-reads 5000 --max-iter 100
 ```
 
 The script performs, in order:
 
-1. case loading from `engioptiqa/problems/powerflow/data/4-bus/`,
+1. case loading from `examples/powerflow/data/4-bus/`,
 2. continuous reference solution (`compute_reference_solution`),
 3. binary discretisation of mu/omega over `[-1.5, 1.5]`,
 4. Amplify polynomial assembly (`generate_problem_formulation`),
@@ -190,7 +195,7 @@ together with the `log.txt` produced by `Problem.print_and_log`.
 
 * [`engioptiqa/problems/powerflow/powerflow_analysis.py`](../../../engioptiqa/problems/powerflow/powerflow_analysis.py) 
   `PowerFlow` problem class, `PowerFlowData` loader.
-* [`engioptiqa/problems/powerflow/data/<case>/`](../../../engioptiqa/problems/powerflow/data/)
+* [`examples/powerflow/data/<case>/`](../../../examples/powerflow/data/)
   tabular input for 4-, 9- and 14-bus cases.
 * [`examples/powerflow/powerflow_4bus.py`](../../../examples/powerflow/powerflow_4bus.py)
   end-to-end runnable demonstration.
