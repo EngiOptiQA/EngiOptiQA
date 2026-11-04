@@ -144,7 +144,7 @@ class Normalized(RealNumber):
 
 class RangeBinary(RealNumber):
     """
-    Range representation of a real number in the range [a_min, a_max].
+    Binary range representation of a real number in the range [a_min, a_max].
     """
     def __init__(self, n_qubits, a_min=None, a_max=None):
         self.n_qubits = n_qubits
@@ -163,6 +163,9 @@ class RangeBinary(RealNumber):
         return self.a_min + scale * sum(F[l] * q[l] for l in range(self.n_qubits))
 
 class RangeUnary(RangeBinary):
+    """
+    Unary range representation of a real number in the range [a_min, a_max].
+    """
     def evaluate(self, q):
         assert len(q) == self.n_qubits
 
