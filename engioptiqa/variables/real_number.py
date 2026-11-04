@@ -9,31 +9,40 @@ class RealNumber:
     The base class itself is not meant to be instantiated directly, but rather serves as a factory for creating
     instances of the appropriate subclass based on the specified binary representation.
     """
-    def __new__(cls, n_qubits, binary_representation, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None):
-        if cls is RealNumber:
-            registry = {
-                'real': Real,
-                'real_reduced': RealReduced,
-                'real_positive': RealPositive,
-                'normalized': Normalized,
-                'range': Range,
-                'adaptive_range': AdaptiveRange
-            }
-            subcls = registry.get(binary_representation)
-            if subcls is None:
-                raise Exception('Unknown binary representation', binary_representation)
-            obj = super().__new__(subcls)  # create instance of subclass
-             # initialize subclass
-            subcls.__init__(obj, n_qubits, binary_representation, a_min, a_max, a_min_lim, a_max_lim)
-            obj.binary_representation = binary_representation
-            return obj
-        # If called on a subclass directly, proceed normally
-        return super().__new__(cls)
+    _registry = {}
 
-    # Keep the original signature; not used in practice on the base.
-    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None):
-        self.n_qubits = n_qubits
-        self.binary_representation = binary_representation
+    @classmethod
+    def create(cls, n_qubits, binary_representation,
+               *, a_min=None, a_max=None,
+               a_min_lim=None, a_max_lim=None):
+
+        try:
+            subcls = cls._registry[binary_representation]
+        except KeyError:
+            raise ValueError(
+                f"Unknown binary representation: {binary_representation!r}"
+            ) from None
+
+        if binary_representation in {
+            "real", "real_reduced", "real_positive", "normalized"
+        }:
+            obj = subcls(n_qubits)
+
+        elif binary_representation in {"range_binary", "range_unary"}:
+            obj = subcls(n_qubits, a_min=a_min, a_max=a_max)
+
+        elif binary_representation in {"adaptive_range_binary", "adaptive_range_unary"}:
+            obj = subcls(
+                n_qubits,
+                a_min=a_min,
+                a_max=a_max,
+                a_min_lim=a_min_lim,
+                a_max_lim=a_max_lim,
+            )
+
+        obj.binary_representation = binary_representation
+        return obj
+
 
     # Keep the original signature for compatibility.
     def evaluate(self, q):
@@ -85,7 +94,7 @@ class RealNumber:
         return q_opt, diff_opt, diff_opt_rel
 
 class Real(RealNumber):
-    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None):
+    def __init__(self, n_qubits):
         self.n_qubits = n_qubits
         if not ((self.n_qubits % 2) == 0 and self.n_qubits >= 6):
             raise Exception('Number of qubits has to be even and >=6 for real representation.')
@@ -98,7 +107,7 @@ class Real(RealNumber):
         return a
 
 class RealReduced(RealNumber):
-    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None):
+    def __init__(self, n_qubits):
         self.n_qubits = n_qubits
         if not ((self.n_qubits % 2) == 0 and self.n_qubits >= 4):
             raise Exception('Number of qubits has to be even and >=4 for real_reduced representation.')
@@ -110,7 +119,7 @@ class RealReduced(RealNumber):
         return a
 
 class RealPositive(RealNumber):
-    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None):
+    def __init__(self, n_qubits):
         self.n_qubits = n_qubits
         if not ((self.n_qubits % 2) == 1 and self.n_qubits >= 3):
             raise Exception('Number of qubits has to be odd and >=3 for real_positive representation.')
@@ -125,7 +134,7 @@ class Normalized(RealNumber):
     """
     Normalized representation of a real number in the range [0, 1].
     """
-    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None):
+    def __init__(self, n_qubits):
         self.n_qubits = n_qubits
 
     def evaluate(self, q, a_min=None, a_max=None):
@@ -133,11 +142,11 @@ class Normalized(RealNumber):
         a = sum(2**l / (2**self.n_qubits - 1) * q[l] for l in range(self.n_qubits))
         return a
 
-class Range(RealNumber):
+class RangeBinary(RealNumber):
     """
     Range representation of a real number in the range [a_min, a_max].
     """
-    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None):
+    def __init__(self, n_qubits, a_min=None, a_max=None):
         self.n_qubits = n_qubits
         self.a_min = a_min
         self.a_max = a_max
@@ -153,12 +162,22 @@ class Range(RealNumber):
         scale = (self.a_max - self.a_min) / (2**self.n_qubits - 1)
         return self.a_min + scale * sum(F[l] * q[l] for l in range(self.n_qubits))
 
-class AdaptiveRange(Range):
+class RangeUnary(RangeBinary):
+    def evaluate(self, q):
+        assert len(q) == self.n_qubits
+
+        # Replace this with your actual unary decoding logic.
+        unary_value = sum(q)
+
+        scale = (self.a_max - self.a_min) / self.n_qubits
+        return self.a_min + scale * unary_value
+
+class AdaptiveRange:
     """
     Adaptive range representation of a real number in the adaptive range [a_min, a_max].
     """
-    def __init__(self, n_qubits, binary_representation, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None ):
-        super().__init__(n_qubits, binary_representation, a_min, a_max)
+    def __init__(self, n_qubits, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None):
+        super().__init__(n_qubits, a_min, a_max)
         self.a_min_lim = a_min_lim
         self.a_max_lim = a_max_lim
 
@@ -257,6 +276,26 @@ class AdaptiveRange(Range):
         value = a_min + norm * (a_max - a_min)
         return value
 
+
+class AdaptiveRangeBinary(AdaptiveRange, RangeBinary):
+    """Adaptive bounds using the standard binary range encoding."""
+    pass
+
+
+class AdaptiveRangeUnary(AdaptiveRange, RangeUnary):
+    """Adaptive bounds using the unary range encoding."""
+    pass
+
+RealNumber._registry = {
+    "real": Real,
+    "real_reduced": RealReduced,
+    "real_positive": RealPositive,
+    "normalized": Normalized,
+    "range_binary": RangeBinary,
+    "range_unary": RangeUnary,
+    "adaptive_range_binary": AdaptiveRangeBinary,
+    "adaptive_range_unary": AdaptiveRangeUnary,
+}
 
 
 

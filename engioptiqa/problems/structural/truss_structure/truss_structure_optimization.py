@@ -60,7 +60,7 @@ class TrussStructureOptimization(TrussStructure):
     def generate_slack_variable(self):
         assert(self.variable_generator is not None)
         q = self.variable_generator.array("Binary", self.n_qubits_slack , name=f"s_vol")
-        s = RealNumber(self.n_qubits_slack, 'normalized')
+        s = RealNumber.create(self.n_qubits_slack, 'normalized')
         self.slack_variable = s.evaluate(q)
 
     def generate_volume_constraint_poly(self):
@@ -184,11 +184,12 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
             self.generate_slack_variable()
 
     def has_adaptive_variables(self):
-        return (self.binary_representation == 'adaptive_range') or (self.binary_representation_area == 'adaptive_range')
+        return ((self.binary_representation in {'adaptive_range_binary', 'adaptive_range_unary'}) or
+                (self.binary_representation_area in {'adaptive_range_binary', 'adaptive_range_unary'}))
 
     def get_number_of_adaptive_vars(self):
-        if self.binary_representation == 'adaptive_range':
-            if self.binary_representation_area == 'adaptive_range':
+        if self.binary_representation in {'adaptive_range_binary', 'adaptive_range_unary'}:
+            if self.binary_representation_area in {'adaptive_range_binary', 'adaptive_range_unary'}:
                 return np.array([self.n_members, self.n_optional_members])
             else:
                 return np.array([self.n_members])
@@ -196,8 +197,8 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
             return np.array([0])
 
     def get_adaptive_vars(self, member_states_sol, member_areas_sol):
-        if self.binary_representation == 'adaptive_range':
-            if self.binary_representation_area == 'adaptive_range':
+        if self.binary_representation in {'adaptive_range_binary', 'adaptive_range_unary'}:
+            if self.binary_representation_area in {'adaptive_range_binary', 'adaptive_range_unary'}:
                 return [member_states_sol, member_areas_sol]
             else:
                 return [member_states_sol]
@@ -252,14 +253,15 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
 
     def generate_member_area_polys(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
         assert(self.variable_generator is not None)
-        if binary_representation in ['range', 'adaptive_range']:
+        if binary_representation in {'range_binary', 'adaptive_range_binary', 'range_unary', 'adaptive_range_unary'}:
             assert(lower_lim is not None and upper_lim is not None), \
                 "Lower and upper limits must be provided for range representation."
             self.A_min = [lower_lim] * self.n_members
             self.A_max = [upper_lim] * self.n_members
         self.n_qubits_per_area = n_qubits_per_var
         self.binary_representation_area = binary_representation
-        self.real_number_areas = RealNumber(self.n_qubits_per_area, self.binary_representation_area, lower_lim, upper_lim, a_min_lim=0.0)
+        self.real_number_areas = RealNumber.create(self.n_qubits_per_area, self.binary_representation_area,
+                                                   a_min=lower_lim, a_max=upper_lim, a_min_lim=0.0)
 
         member_area_polys = []
         member_areas = self.get_member_areas()
@@ -289,7 +291,7 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
                         self.members[i_member].exists = False
                     else:
                         q = self.variable_generator.array("Binary", self.n_qubits_per_area, name=f"q_A_{i_optional_member}")
-                        if self.binary_representation_area == 'adaptive_range':
+                        if self.binary_representation_area in {'adaptive_range_binary', 'adaptive_range_unary'}:
                             self.real_number_areas.set_range(self.A_min[i_member], self.A_max[i_member])
                         member_area_polys.append(self.real_number_areas.evaluate(q))
                 i_optional_member += 1

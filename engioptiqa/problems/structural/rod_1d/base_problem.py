@@ -144,16 +144,16 @@ class BaseProblemRod1D(Problem):
         return self.real_number
 
     def has_adaptive_variables(self):
-        return self.binary_representation == 'adaptive_range'
+        return self.binary_representation in {'adaptive_range_binary', 'adaptive_range_unary'}
 
     def get_number_of_adaptive_vars(self):
-        if self.binary_representation == 'adaptive_range':
+        if self.binary_representation in {'adaptive_range_binary', 'adaptive_range_unary'}:
             return np.array([self.rod.n_comp])
         else:
             return np.array([0])
 
     def get_adaptive_vars(self, nf_sol):
-        if self.binary_representation == 'adaptive_range':
+        if self.binary_representation in {'adaptive_range_binary', 'adaptive_range_unary'}:
             return [nf_sol]
         else:
             return None
@@ -209,14 +209,14 @@ class BaseProblemRod1D(Problem):
     def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None, variable_ordering='blocked'):
         self.set_variable_ordering(variable_ordering)
         self.initialize_discretization()
-        if binary_representation in ['range', 'adaptive_range']:
+        if binary_representation in {'range_binary', 'adaptive_range_binary', 'range_unary', 'adaptive_range_unary'}:
             assert(lower_lim is not None and upper_lim is not None), \
                 "Lower and upper limits must be provided for range representation."
             self.a_min = np.ones(self.rod.n_comp)*lower_lim
             self.a_max = np.ones(self.rod.n_comp)*upper_lim
         self.n_qubits_per_var = n_qubits_per_var
         self.binary_representation = binary_representation
-        self.real_number = RealNumber(self.n_qubits_per_var, self.binary_representation, lower_lim, upper_lim)
+        self.real_number = RealNumber.create(self.n_qubits_per_var, self.binary_representation, a_min=lower_lim, a_max=upper_lim)
         if self.variable_ordering == 'blocked':
             self.generate_nodal_force_polys()
             self.generate_cross_section_inverse_polys()
@@ -238,7 +238,7 @@ class BaseProblemRod1D(Problem):
 
     def generate_nodal_force_poly(self, i_comp):
         assert(self.variable_generator is not None)
-        if self.binary_representation == 'adaptive_range':
+        if self.binary_representation in {'adaptive_range_binary', 'adaptive_range_unary'}:
                 self.real_number.set_range(self.a_min[i_comp], self.a_max[i_comp])
         q_force  = self.variable_generator.array("Binary", self.n_qubits_per_var, name=f"a^{i_comp}")
         return self.real_number.evaluate(q_force)

@@ -438,16 +438,16 @@ class TrussStructure(Problem):
         self.generate_member_area_polys()
 
     def has_adaptive_variables(self):
-        return self.binary_representation == 'adaptive_range'
+        return self.binary_representation in {'adaptive_range_binary', 'adaptive_range_unary'}
 
     def get_number_of_adaptive_vars(self):
-        if self.binary_representation == 'adaptive_range':
+        if self.binary_representation in {'adaptive_range_binary', 'adaptive_range_unary'}:
             return np.array([self.n_members])
         else:
             return np.array([0])
 
     def get_adaptive_vars(self, member_states_sol, member_areas_sol):
-        if self.binary_representation == 'adaptive_range':
+        if self.binary_representation in {'adaptive_range_binary', 'adaptive_range_unary'}:
             return [member_states_sol]
         else:
             return None
@@ -462,7 +462,7 @@ class TrussStructure(Problem):
 
     def get_range_limits(self, i_group):
         assert(i_group == 0)
-        if self.binary_representation == 'adaptive_range':
+        if self.binary_representation in {'adaptive_range_binary', 'adaptive_range_unary'}:
             return self.a_min, self.a_max
         else:
             return None, None
@@ -473,14 +473,14 @@ class TrussStructure(Problem):
 
     def generate_member_state_polys(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None):
         assert(self.variable_generator is not None)
-        if binary_representation in ['range', 'adaptive_range']:
+        if binary_representation in {'range_binary', 'adaptive_range_binary', 'range_unary', 'adaptive_range_unary'}:
             assert(lower_lim is not None and upper_lim is not None), \
                 "Lower and upper limits must be provided for range representation."
             self.a_min = np.ones(len(self.members))*lower_lim
             self.a_max = np.ones(len(self.members))*upper_lim
         self.n_qubits_per_var = n_qubits_per_var
         self.binary_representation = binary_representation
-        self.real_number = RealNumber(self.n_qubits_per_var, self.binary_representation, lower_lim, upper_lim)
+        self.real_number = RealNumber.create(self.n_qubits_per_var, self.binary_representation, a_min=lower_lim, a_max=upper_lim)
 
         member_state_polys = []
         for i_member, _ in enumerate(self.members):
@@ -493,7 +493,7 @@ class TrussStructure(Problem):
         member_state_polys = []
         for i_member, _ in enumerate(self.members):
             q = self.variable_generator.array("Binary", self.n_qubits_per_var, name=f"q_S_{i_member}")
-            if self.binary_representation == 'adaptive_range':
+            if self.binary_representation in {'adaptive_range_binary', 'adaptive_range_unary'}:
                 self.real_number.set_range(self.a_min[i_member], self.a_max[i_member])
             member_state_polys.append(self.real_number.evaluate(q))
         self.member_state_polys = member_state_polys
