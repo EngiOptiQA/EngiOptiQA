@@ -10,5 +10,7 @@ dist/
 examples/**/results/
 **/playground/
 
-# IDE files
+.venv/
 .idea/
+~$*.xlsx
+examples/powerflow/results/
