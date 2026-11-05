@@ -43,5 +43,6 @@ Specific Problem Formulations
    :maxdepth: 1
 
    structural/structural
+   powerflow/powerflow
 
 
