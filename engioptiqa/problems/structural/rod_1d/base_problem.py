@@ -206,17 +206,17 @@ class BaseProblemRod1D(Problem):
     def get_n_design_qubits_per_comp(self):
         return 0
 
-    def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None, variable_ordering='blocked'):
+    def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None, variable_ordering='blocked', mu=None):
         self.set_variable_ordering(variable_ordering)
         self.initialize_discretization()
-        if binary_representation in {'range_binary', 'adaptive_range_binary', 'range_unary', 'adaptive_range_unary'}:
+        if binary_representation in {'range_binary', 'adaptive_range_binary', 'range_bce', 'adaptive_range_bce',  'range_unary', 'adaptive_range_unary'}:
             assert(lower_lim is not None and upper_lim is not None), \
                 "Lower and upper limits must be provided for range representation."
             self.a_min = np.ones(self.rod.n_comp)*lower_lim
             self.a_max = np.ones(self.rod.n_comp)*upper_lim
         self.n_qubits_per_var = n_qubits_per_var
         self.binary_representation = binary_representation
-        self.real_number = RealNumber.create(self.n_qubits_per_var, self.binary_representation, a_min=lower_lim, a_max=upper_lim)
+        self.real_number = RealNumber.create(self.n_qubits_per_var, self.binary_representation, a_min=lower_lim, a_max=upper_lim, mu=mu)
         if self.variable_ordering == 'blocked':
             self.generate_nodal_force_polys()
             self.generate_cross_section_inverse_polys()

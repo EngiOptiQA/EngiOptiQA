@@ -313,9 +313,14 @@ class AdaptiveRange:
             norm = (value - a_min) / (a_max - a_min)
         norm = min(max(norm, 0.0), 1.0)
         int_val = int(round(norm * sum(self.weights)))
-        for bits in itertools.product([0, 1], repeat=self.n_qubits):
-            if sum(w * b for w, b in zip(self.weights, bits)) == int_val:
-                return list(bits)
+        bits = [0] * self.n_qubits
+        for i in range(self.n_qubits - 1, -1, -1):
+            if self.weights[i] <= int_val:
+                bits[i] = 1
+                int_val -= self.weights[i]
+        if int_val != 0:
+            raise ValueError("Value not representable with these weights")
+        return bits
 
     def decode_bits_to_real(self, bits, a_min, a_max):
         int_val = sum(w * (b & 1) for w, b in zip(self.weights, bits))
