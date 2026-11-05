@@ -14,7 +14,7 @@ class RealNumber:
     @classmethod
     def create(cls, n_qubits, binary_representation,
                *, a_min=None, a_max=None,
-               a_min_lim=None, a_max_lim=None):
+               a_min_lim=None, a_max_lim=None, mu=None):
 
         try:
             subcls = cls._registry[binary_representation]
@@ -31,6 +31,9 @@ class RealNumber:
         elif binary_representation in {"range_binary", "range_unary"}:
             obj = subcls(n_qubits, a_min=a_min, a_max=a_max)
 
+        elif binary_representation == "range_bce":
+            obj = subcls(n_qubits, a_min=a_min, a_max=a_max, mu=mu)
+
         elif binary_representation in {"adaptive_range_binary", "adaptive_range_unary"}:
             obj = subcls(
                 n_qubits,
@@ -38,6 +41,16 @@ class RealNumber:
                 a_max=a_max,
                 a_min_lim=a_min_lim,
                 a_max_lim=a_max_lim,
+            )
+
+        elif binary_representation == "adaptive_range_bce":
+            obj = subcls(
+                n_qubits,
+                a_min=a_min,
+                a_max=a_max,
+                a_min_lim=a_min_lim,
+                a_max_lim=a_max_lim,
+                mu=mu,
             )
 
         obj.binary_representation = binary_representation
@@ -154,26 +167,57 @@ class RangeBinary(RealNumber):
             raise Exception('a_min and a_max must be set for range representation.')
         if self.a_max <= self.a_min:
             raise Exception('a_max must be greater than a_min.')
+        self.weights = [2 ** l for l in range(self.n_qubits)]
 
     def evaluate(self, q):
         assert len(q) == self.n_qubits
 
-        F = 2 ** np.arange(self.n_qubits, dtype=float)
-        scale = (self.a_max - self.a_min) / (2**self.n_qubits - 1)
-        return self.a_min + scale * sum(F[l] * q[l] for l in range(self.n_qubits))
+        scale = (self.a_max - self.a_min) / sum(self.weights)
+        return self.a_min + scale * sum(self.weights[l] * q[l] for l in range(self.n_qubits))
 
-class RangeUnary(RangeBinary):
+
+class RangeBCE(RangeBinary):
+    """
+    Bounded-coefficient range representation (Karimi & Ronagh, 2019) of a real number in the range [a_min, a_max].
+    """
+    def __init__(self, n_qubits, a_min=None, a_max=None, mu=None):
+        super().__init__(n_qubits, a_min=a_min, a_max=a_max)
+        if mu is None:
+            raise ValueError('mu must be set for BCE representation.')
+        self.mu = mu
+        self.weights = self.bounded_coefficient_encoding(self.max_kappa(n_qubits, mu), mu)
+
+    @staticmethod
+    def bounded_coefficient_encoding(kappa, mu):
+        log2 = lambda n: n.bit_length() - 1
+
+        if kappa < 2 ** (log2(mu) + 1):
+            p = log2(kappa)
+            return [2 ** i for i in range(p)] + [kappa - (2 ** p - 1)]
+
+        rho = log2(mu) + 1
+        nu = kappa - (2 ** rho - 1)
+        eta = nu // mu
+        w = [2 ** i for i in range(rho)] + [mu] * eta
+        if nu - eta * mu != 0:
+            w.append(nu - eta * mu)
+        return w
+
+    @staticmethod
+    def max_kappa(n_qubits, mu):
+        rho = mu.bit_length()
+        if n_qubits <= rho:
+            return 2 ** n_qubits - 1
+        return (2 ** rho - 1) + (n_qubits - rho) * mu
+
+
+class RangeUnary(RangeBCE):
     """
     Unary range representation of a real number in the range [a_min, a_max].
     """
-    def evaluate(self, q):
-        assert len(q) == self.n_qubits
+    def __init__(self, n_qubits, a_min=None, a_max=None):
+        super().__init__(n_qubits, a_min=a_min, a_max=a_max, mu=1)
 
-        # Replace this with your actual unary decoding logic.
-        unary_value = sum(q)
-
-        scale = (self.a_max - self.a_min) / self.n_qubits
-        return self.a_min + scale * unary_value
 
 class AdaptiveRange:
     """
@@ -262,20 +306,20 @@ class AdaptiveRange:
 
         return a_bits, a_new, rel_err_a_encoded
 
-    def encode_real_to_bits(self,value, a_min, a_max):
+    def encode_real_to_bits(self, value, a_min, a_max):
         if a_max == a_min:
             norm = 0.0
         else:
             norm = (value - a_min) / (a_max - a_min)
         norm = min(max(norm, 0.0), 1.0)
-        int_val = int(round(norm * (2**self.n_qubits - 1)))
-        bits = [int(c) for c in format(int_val, f'0{self.n_qubits}b')[::-1]]
-        return bits
+        int_val = int(round(norm * sum(self.weights)))
+        for bits in itertools.product([0, 1], repeat=self.n_qubits):
+            if sum(w * b for w, b in zip(self.weights, bits)) == int_val:
+                return list(bits)
 
     def decode_bits_to_real(self, bits, a_min, a_max):
-        int_val = sum((b & 1) << i for i, b in enumerate(bits))
-        denom = (2**self.n_qubits - 1)
-        norm = int_val / denom if denom > 0 else 0.0
+        int_val = sum(w * (b & 1) for w, b in zip(self.weights, bits))
+        norm = int_val / sum(self.weights)
         value = a_min + norm * (a_max - a_min)
         return value
 
@@ -289,6 +333,14 @@ class AdaptiveRangeUnary(AdaptiveRange, RangeUnary):
     """Adaptive bounds using the unary range encoding."""
     pass
 
+
+class AdaptiveRangeBCE(AdaptiveRange, RangeBCE):
+    """Adaptive bounds using the bounded-coefficient range encoding."""
+    def __init__(self, n_qubits, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None, mu=None):
+        RangeBCE.__init__(self, n_qubits, a_min, a_max, mu)
+        self.a_min_lim = a_min_lim
+        self.a_max_lim = a_max_lim
+
 RealNumber._registry = {
     "real": Real,
     "real_reduced": RealReduced,
@@ -296,9 +348,8 @@ RealNumber._registry = {
     "normalized": Normalized,
     "range_binary": RangeBinary,
     "range_unary": RangeUnary,
+    "range_bce": RangeBCE,
     "adaptive_range_binary": AdaptiveRangeBinary,
     "adaptive_range_unary": AdaptiveRangeUnary,
+    "adaptive_range_bce": AdaptiveRangeBCE,
 }
-
-
-

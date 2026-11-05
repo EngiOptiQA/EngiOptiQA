@@ -144,16 +144,16 @@ class BaseProblemRod1D(Problem):
         return self.real_number
 
     def has_adaptive_variables(self):
-        return self.binary_representation in {'adaptive_range_binary', 'adaptive_range_unary'}
+        return self.binary_representation in {'adaptive_range_binary', 'adaptive_range_bce', 'adaptive_range_unary'}
 
     def get_number_of_adaptive_vars(self):
-        if self.binary_representation in {'adaptive_range_binary', 'adaptive_range_unary'}:
+        if self.binary_representation in {'adaptive_range_binary', 'adaptive_range_bce', 'adaptive_range_unary'}:
             return np.array([self.rod.n_comp])
         else:
             return np.array([0])
 
     def get_adaptive_vars(self, nf_sol):
-        if self.binary_representation in {'adaptive_range_binary', 'adaptive_range_unary'}:
+        if self.binary_representation in {'adaptive_range_binary', 'adaptive_range_bce', 'adaptive_range_unary'}:
             return [nf_sol]
         else:
             return None
@@ -238,7 +238,7 @@ class BaseProblemRod1D(Problem):
 
     def generate_nodal_force_poly(self, i_comp):
         assert(self.variable_generator is not None)
-        if self.binary_representation in {'adaptive_range_binary', 'adaptive_range_unary'}:
+        if self.binary_representation in {'adaptive_range_binary', 'adaptive_range_bce', 'adaptive_range_unary'}:
                 self.real_number.set_range(self.a_min[i_comp], self.a_max[i_comp])
         q_force  = self.variable_generator.array("Binary", self.n_qubits_per_var, name=f"a^{i_comp}")
         return self.real_number.evaluate(q_force)
