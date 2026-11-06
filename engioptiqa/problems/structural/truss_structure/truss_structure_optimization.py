@@ -7,6 +7,7 @@ class TrussStructureOptimization(TrussStructure):
     def __init__(self, nsd, formulation, volume_constraint = {}, output_path=None):
         super().__init__(nsd=nsd, formulation=formulation, output_path=output_path)
         self.volume_constraint = volume_constraint
+        self.mu=None
         if volume_constraint['mode'] == 'direct':
              self.target_volume = volume_constraint.get('target', None)
         elif volume_constraint['mode'] == 'num_add_members':
@@ -27,6 +28,7 @@ class TrussStructureOptimization(TrussStructure):
         self.initialize_discretization()
         self.generate_member_state_polys(n_qubits_per_var, binary_representation_state, lower_lim_state, upper_lim_state, mu)
         self.generate_member_area_polys()
+        self.mu = mu
         if self.volume_constraint['type'] == 'ineq':
             self.n_qubits_slack = n_qubits_slack
             self.generate_slack_variable()
@@ -60,7 +62,12 @@ class TrussStructureOptimization(TrussStructure):
     def generate_slack_variable(self):
         assert(self.variable_generator is not None)
         q = self.variable_generator.array("Binary", self.n_qubits_slack , name=f"s_vol")
-        s = RealNumber.create(self.n_qubits_slack, 'normalized')
+        enc = self.binary_representation.removeprefix('adaptive_')
+        if enc not in {'range_binary', 'range_bce', 'range_unary'}:
+            raise ValueError(f"Slack needs a range encoding, got '{self.binary_representation}'.")
+        s = RealNumber.create(self.n_qubits_slack, enc, a_min=0.0, a_max=1.0, mu=self.mu)
+        if self.volume_constraint['mode'] == 'num_add_members':
+            s.a_max = sum(s.weights) / self.target_num_add_members
         self.slack_variable = s.evaluate(q)
 
     def generate_volume_constraint_poly(self):
@@ -179,6 +186,7 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
         self.initialize_discretization()
         self.generate_member_state_polys(n_qubits_per_var, binary_representation_state, lower_lim_state, upper_lim_state, mu)
         self.generate_member_area_polys(n_qubits_per_area, binary_representation_area, lower_lim_area, upper_lim_area, mu)
+        self.mu = mu
         if self.volume_constraint['type'] == 'ineq':
             self.n_qubits_slack = n_qubits_slack
             self.generate_slack_variable()
