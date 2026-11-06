@@ -10,3 +10,7 @@ dist/
 examples/**/results/
 **/playground/
 
+.venv/
+.idea/
+~$*.xlsx
+examples/powerflow/results/

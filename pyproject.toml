@@ -20,9 +20,11 @@ dependencies = [
     "matplotlib~=3.10",
     "numpy~=2.0",
     "openjij~=0.11",
+    "pandas~=3.0",
     "pennylane~=0.44",
     "pennylane-lightning",
     "prettytable~=3.17",
+    "scipy~=1.16",
     "sympy~=1.14"
 ]
 dynamic = ["version"]
