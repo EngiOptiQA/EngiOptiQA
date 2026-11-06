@@ -47,7 +47,7 @@ def main():
     parser = argparse.ArgumentParser(description='One-shot AC power flow with EngiOptiQA/OpenJij')
     parser.add_argument('--bus', type=int, choices=[2, 4, 9, 14], default=2)
     parser.add_argument('--bits', type=int, default=2)
-    parser.add_argument('--encoding', choices=['adaptive_range', 'range', 'increment_decrement'], default='adaptive_range')
+    parser.add_argument('--encoding', choices=['adaptive_range_binary', 'range_binary', 'increment_decrement'], default='adaptive_range_binary')
     parser.add_argument('--lower-lim', type=float, default=None,
                         help='Optional legacy common lower bound for both components')
     parser.add_argument('--upper-lim', type=float, default=None,

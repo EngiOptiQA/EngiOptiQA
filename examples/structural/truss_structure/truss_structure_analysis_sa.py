@@ -74,7 +74,7 @@ ts.set_reference_solution(ts_ref)
 
 # Discretization through Binary Representation of Real-Valued Member Stress
 # -------------------------------------------------------------------------
-binary_representation = 'range'
+binary_representation = 'range_binary'
 n_qubits_per_var = 10
 ts.generate_discretization(n_qubits_per_var=n_qubits_per_var,
                            binary_representation=binary_representation,
@@ -156,7 +156,7 @@ ts_3d.set_reference_solution(ts_3d_ref)
 
 # Discretization through Binary Representation of Real-Valued Member Stress
 # -------------------------------------------------------------------------
-binary_representation = 'range'
+binary_representation = 'range_binary'
 n_qubits_per_var = 10
 ts_3d.generate_discretization(n_qubits_per_var=n_qubits_per_var,
                            binary_representation=binary_representation,
