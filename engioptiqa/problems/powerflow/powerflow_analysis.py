@@ -118,7 +118,7 @@ class PowerFlow(Problem):
                 raise ValueError("Real/imaginary bounds must be finite and strictly increasing")
             self.mu_range = (ml, mh)
             self.omega_range = (wl, wh)
-            self.real_number = RealNumber.create(self.n_qubits_per_var, binary_representation, float(ml), float(mh))
+            self.real_number = RealNumber.create(self.n_qubits_per_var, binary_representation, a_min= float(ml), a_max=float(mh))
             for i in range(n):
                 if i == self.data.ref_bus:
                     mu_polys[i], omega_polys[i] = 1.0, 0.0
@@ -126,8 +126,8 @@ class PowerFlow(Problem):
                 q_mu = self.variable_generator.array("Binary", self.n_qubits_per_var)
                 q_omega = self.variable_generator.array("Binary", self.n_qubits_per_var)
                 # 'range' has no set_range: build two RealNumber instances.
-                real_mu = RealNumber.create(self.n_qubits_per_var, binary_representation, float(ml), float(mh))
-                real_omega = RealNumber.create(self.n_qubits_per_var, binary_representation, float(wl), float(wh))
+                real_mu = RealNumber.create(self.n_qubits_per_var, binary_representation, a_min=float(ml), a_max=float(mh))
+                real_omega = RealNumber.create(self.n_qubits_per_var, binary_representation, a_min=float(wl), a_max=float(wh))
                 mu_polys[i] = real_mu.evaluate(q_mu)
                 omega_polys[i] = real_omega.evaluate(q_omega)
 
