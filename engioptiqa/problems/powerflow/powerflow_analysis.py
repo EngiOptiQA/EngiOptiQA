@@ -67,7 +67,7 @@ class PowerFlow(Problem):
     def generate_discretization(
         self,
         n_qubits_per_var=2,
-        binary_representation="adaptive_range",
+        binary_representation="adaptive_range_binary",
         lower_lim=None,
         upper_lim=None,
         *,
@@ -82,7 +82,7 @@ class PowerFlow(Problem):
     ):
         """Create binary voltage polynomials for one of two encodings.
 
-        RANGE: 'range' or 'adaptive_range', any positive bits/component.
+        RANGE: 'range_binary' or 'adaptive_range_binary', any positive bits/component.
         By default mu=[0.8, 1.2] and omega=[-0.2, 0.2]. Optional
         component-specific bounds override these defaults. For legacy callers,
         lower_lim/upper_lim (if both supplied) set BOTH component ranges,
@@ -104,7 +104,7 @@ class PowerFlow(Problem):
         mu_polys = [None] * n
         omega_polys = [None] * n
 
-        if binary_representation in ("adaptive_range", "range"):
+        if binary_representation in ("adaptive_range_binary", "range_binary"):
             if (lower_lim is None) != (upper_lim is None):
                 raise ValueError("lower_lim and upper_lim must be provided together")
             common_lower = lower_lim
@@ -118,7 +118,7 @@ class PowerFlow(Problem):
                 raise ValueError("Real/imaginary bounds must be finite and strictly increasing")
             self.mu_range = (ml, mh)
             self.omega_range = (wl, wh)
-            self.real_number = RealNumber(self.n_qubits_per_var, binary_representation, float(ml), float(mh))
+            self.real_number = RealNumber.create(self.n_qubits_per_var, binary_representation, float(ml), float(mh))
             for i in range(n):
                 if i == self.data.ref_bus:
                     mu_polys[i], omega_polys[i] = 1.0, 0.0
@@ -126,8 +126,8 @@ class PowerFlow(Problem):
                 q_mu = self.variable_generator.array("Binary", self.n_qubits_per_var)
                 q_omega = self.variable_generator.array("Binary", self.n_qubits_per_var)
                 # 'range' has no set_range: build two RealNumber instances.
-                real_mu = RealNumber(self.n_qubits_per_var, binary_representation, float(ml), float(mh))
-                real_omega = RealNumber(self.n_qubits_per_var, binary_representation, float(wl), float(wh))
+                real_mu = RealNumber.create(self.n_qubits_per_var, binary_representation, float(ml), float(mh))
+                real_omega = RealNumber.create(self.n_qubits_per_var, binary_representation, float(wl), float(wh))
                 mu_polys[i] = real_mu.evaluate(q_mu)
                 omega_polys[i] = real_omega.evaluate(q_omega)
 
@@ -162,7 +162,7 @@ class PowerFlow(Problem):
                 mu_polys[i] = float(mc[i]) + float(delta_mu) * (q_mu[0] - q_mu[1])
                 omega_polys[i] = float(wc[i]) + float(delta_omega) * (q_omega[0] - q_omega[1])
         else:
-            raise ValueError("PowerFlow supports 'range', 'adaptive_range', or 'increment_decrement'")
+            raise ValueError("PowerFlow supports 'range_binary', 'adaptive_range_binary', or 'increment_decrement'")
 
         self.mu_polys = mu_polys
         self.omega_polys = omega_polys
