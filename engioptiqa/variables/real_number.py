@@ -14,7 +14,7 @@ class RealNumber:
     @classmethod
     def create(cls, n_qubits, binary_representation,
                *, a_min=None, a_max=None,
-               a_min_lim=None, a_max_lim=None, coefficient_upper_bound=None):
+               a_min_lim=None, a_max_lim=None, weight_upper_bound=None):
 
         try:
             subcls = cls._registry[binary_representation]
@@ -32,7 +32,7 @@ class RealNumber:
             obj = subcls(n_qubits, a_min=a_min, a_max=a_max)
 
         elif binary_representation == "range_bce":
-            obj = subcls(n_qubits, a_min=a_min, a_max=a_max, coefficient_upper_bound=coefficient_upper_bound)
+            obj = subcls(n_qubits, a_min=a_min, a_max=a_max, weight_upper_bound=weight_upper_bound)
 
         elif binary_representation in {"adaptive_range_binary", "adaptive_range_unary"}:
             obj = subcls(
@@ -50,7 +50,7 @@ class RealNumber:
                 a_max=a_max,
                 a_min_lim=a_min_lim,
                 a_max_lim=a_max_lim,
-                coefficient_upper_bound=coefficient_upper_bound,
+                weight_upper_bound=weight_upper_bound,
             )
 
         obj.binary_representation = binary_representation
@@ -192,52 +192,52 @@ class RangeBCE(RangeEncoding):
     """
     Bounded-coefficient range representation (Karimi & Ronagh, 2019) of a real number in the range [a_min, a_max].
     """
-    def __init__(self, n_qubits, a_min=None, a_max=None, coefficient_upper_bound=None):
+    def __init__(self, n_qubits, a_min=None, a_max=None, weight_upper_bound=None):
         super().__init__(n_qubits, a_min=a_min, a_max=a_max)
-        if coefficient_upper_bound is None:
-            raise ValueError('coefficient_upper_bound must be set for BCE representation.')
-        if not isinstance(coefficient_upper_bound, int) or coefficient_upper_bound <= 0:
-            raise ValueError('coefficient_upper_bound must be a positive integer.')
-        self.coefficient_upper_bound = coefficient_upper_bound
-        # If coefficient_upper_bound >= 2 ** (n_qubits - 1), this reduces to standard binary encoding.
-        self.weights = self.bounded_coefficient_encoding(self.get_encoder_integer_upper_bound(n_qubits, coefficient_upper_bound), coefficient_upper_bound)
+        if weight_upper_bound is None:
+            raise ValueError('weight_upper_bound must be set for BCE representation.')
+        if not isinstance(weight_upper_bound, int) or weight_upper_bound <= 0:
+            raise ValueError('weight_upper_bound must be a positive integer.')
+        self.weight_upper_bound = weight_upper_bound
+        # If weight_upper_bound >= 2 ** (n_qubits - 1), this reduces to standard binary encoding.
+        self.weights = self.bounded_coefficient_encoding(self.get_encoder_integer_upper_bound(n_qubits, weight_upper_bound), weight_upper_bound)
 
     @staticmethod
-    def bounded_coefficient_encoding(encoded_integer_upper_bound, coefficient_upper_bound):
+    def bounded_coefficient_encoding(weights_sum, weight_upper_bound):
         """
         Returns a list of weights for the bounded-coefficient encoding.
-        encoded_integer_upper_bound: int, the upper bound of the encoded integer range, corresponding to kappa in the reference.
-        coefficient_upper_bound: int, the upper bound of the coefficients, corresponding to mu in the reference.
+        weights_sum: int, the sum of the weights, corresponding to the upper bound on the encoded integer range (kappa) in the reference.
+        weight_upper_bound: int, the upper bound on the weights, corresponding to the upper bound on the coefficients of the enconding (mu) in the reference.
         """
         log2 = lambda n: n.bit_length() - 1
 
-        if encoded_integer_upper_bound < 2 ** (log2(coefficient_upper_bound) + 1):
-            p = log2(encoded_integer_upper_bound)
-            return [2 ** i for i in range(p)] + [encoded_integer_upper_bound - (2 ** p - 1)]
+        if weights_sum < 2 ** (log2(weight_upper_bound) + 1):
+            p = log2(weights_sum)
+            return [2 ** i for i in range(p)] + [weights_sum - (2 ** p - 1)]
 
-        rho = log2(coefficient_upper_bound) + 1
-        nu = encoded_integer_upper_bound - (2 ** rho - 1)
-        eta = nu // coefficient_upper_bound
-        w = [2 ** i for i in range(rho)] + [coefficient_upper_bound] * eta
-        if nu - eta * coefficient_upper_bound != 0:
-            w.append(nu - eta * coefficient_upper_bound)
+        rho = log2(weight_upper_bound) + 1
+        nu = weights_sum - (2 ** rho - 1)
+        eta = nu // weight_upper_bound
+        w = [2 ** i for i in range(rho)] + [weight_upper_bound] * eta
+        if nu - eta * weight_upper_bound != 0:
+            w.append(nu - eta * weight_upper_bound)
         return w
 
     @staticmethod
-    def get_encoder_integer_upper_bound(n_qubits, coefficient_upper_bound):
-        rho = coefficient_upper_bound.bit_length()
+    def get_encoder_integer_upper_bound(n_qubits, weight_upper_bound):
+        rho = weight_upper_bound.bit_length()
         if n_qubits <= rho:
             return 2 ** n_qubits - 1
-        return (2 ** rho - 1) + (n_qubits - rho) * coefficient_upper_bound
+        return (2 ** rho - 1) + (n_qubits - rho) * weight_upper_bound
 
 
 class RangeUnary(RangeBCE):
     """
     Unary range representation of a real number in the range [a_min, a_max].
-    Special case of the bounded-coefficient encoding with coefficient_upper_bound = 1.
+    Special case of the bounded-coefficient encoding with weight_upper_bound = 1.
     """
     def __init__(self, n_qubits, a_min=None, a_max=None):
-        super().__init__(n_qubits, a_min=a_min, a_max=a_max, coefficient_upper_bound=1)
+        super().__init__(n_qubits, a_min=a_min, a_max=a_max, weight_upper_bound=1)
 
 
 class AdaptiveRange:
@@ -362,8 +362,8 @@ class AdaptiveRangeUnary(AdaptiveRange, RangeUnary):
 
 class AdaptiveRangeBCE(AdaptiveRange, RangeBCE):
     """Adaptive bounds using the bounded-coefficient range encoding."""
-    def __init__(self, n_qubits, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None, coefficient_upper_bound=None):
-        RangeBCE.__init__(self, n_qubits, a_min, a_max, coefficient_upper_bound)
+    def __init__(self, n_qubits, a_min=None, a_max=None, a_min_lim=None, a_max_lim=None, weight_upper_bound=None):
+        RangeBCE.__init__(self, n_qubits, a_min, a_max, weight_upper_bound)
         self.a_min_lim = a_min_lim
         self.a_max_lim = a_max_lim
 

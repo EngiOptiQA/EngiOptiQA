@@ -66,8 +66,8 @@ class TrussStructureOptimization(TrussStructure):
         if enc not in {'range_binary', 'range_bce', 'range_unary'}:
             raise ValueError(f"Slack needs a range encoding, got '{self.binary_representation}'.")
         s = RealNumber.create(self.n_qubits_slack, enc, a_min=0.0, a_max=1.0, mu=self.mu)
-        # Each slack unit corresponds to one member (step 1/M_max), so M/M_max + S - 1 = 0 is exact for integer M.
-        # The n. of qubits for the slack variable should be enough to represent M_max.
+        # When an upper bound on the number of members is enforced, each slack unit must correspond to one member (step 1/M_max),
+        # so M/M_max + S - 1 = 0 is exact for integer M. The n. of qubits for the slack variable should be enough to represent M_max.
         if self.volume_constraint['mode'] == 'num_add_members':
             s.a_max = sum(s.weights) / self.target_num_add_members
         self.slack_variable = s.evaluate(q)

@@ -432,9 +432,9 @@ class TrussStructure(Problem):
     def initialize_discretization(self):
         self.variable_generator = VariableGenerator()
 
-    def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None, coefficient_upper_bound=None):
+    def generate_discretization(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None, weight_upper_bound=None):
         self.initialize_discretization()
-        self.generate_member_state_polys(n_qubits_per_var, binary_representation, lower_lim, upper_lim, coefficient_upper_bound)
+        self.generate_member_state_polys(n_qubits_per_var, binary_representation, lower_lim, upper_lim, weight_upper_bound)
         self.generate_member_area_polys()
 
     def has_adaptive_variables(self):
@@ -471,7 +471,7 @@ class TrussStructure(Problem):
         self.update_member_state_polys()
         self.generate_member_area_polys()
 
-    def generate_member_state_polys(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None, coefficient_upper_bound=None):
+    def generate_member_state_polys(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None, weight_upper_bound=None):
         assert(self.variable_generator is not None)
         if binary_representation in {'range_binary', 'adaptive_range_binary', 'range_unary', 'adaptive_range_unary', 'range_bce', 'adaptive_range_bce'}:
             assert(lower_lim is not None and upper_lim is not None), \
@@ -480,7 +480,7 @@ class TrussStructure(Problem):
             self.a_max = np.ones(len(self.members))*upper_lim
         self.n_qubits_per_var = n_qubits_per_var
         self.binary_representation = binary_representation
-        self.real_number = RealNumber.create(self.n_qubits_per_var, self.binary_representation, a_min=lower_lim, a_max=upper_lim, coefficient_upper_bound=coefficient_upper_bound)
+        self.real_number = RealNumber.create(self.n_qubits_per_var, self.binary_representation, a_min=lower_lim, a_max=upper_lim, weight_upper_bound=weight_upper_bound)
 
         member_state_polys = []
         for i_member, _ in enumerate(self.members):
