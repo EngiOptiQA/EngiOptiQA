@@ -7,7 +7,7 @@ class TrussStructureOptimization(TrussStructure):
     def __init__(self, nsd, formulation, volume_constraint = {}, output_path=None):
         super().__init__(nsd=nsd, formulation=formulation, output_path=output_path)
         self.volume_constraint = volume_constraint
-        self.mu=None
+        self.weight_upper_bound=None
         if volume_constraint['mode'] == 'direct':
              self.target_volume = volume_constraint.get('target', None)
         elif volume_constraint['mode'] == 'num_add_members':
@@ -24,11 +24,11 @@ class TrussStructureOptimization(TrussStructure):
     def generate_discretization(self,
                                 n_qubits_per_var, binary_representation_state,
                                 lower_lim_state=None, upper_lim_state=None,
-                                n_qubits_slack=3, mu=None):
+                                n_qubits_slack=3, weight_upper_bound=None):
         self.initialize_discretization()
-        self.generate_member_state_polys(n_qubits_per_var, binary_representation_state, lower_lim_state, upper_lim_state, mu)
+        self.generate_member_state_polys(n_qubits_per_var, binary_representation_state, lower_lim_state, upper_lim_state, weight_upper_bound)
         self.generate_member_area_polys()
-        self.mu = mu
+        self.weight_upper_bound = weight_upper_bound
         if self.volume_constraint['type'] == 'ineq':
             self.n_qubits_slack = n_qubits_slack
             self.generate_slack_variable()
@@ -65,7 +65,7 @@ class TrussStructureOptimization(TrussStructure):
         enc = self.binary_representation.removeprefix('adaptive_')
         if enc not in {'range_binary', 'range_bce', 'range_unary'}:
             raise ValueError(f"Slack needs a range encoding, got '{self.binary_representation}'.")
-        s = RealNumber.create(self.n_qubits_slack, enc, a_min=0.0, a_max=1.0, mu=self.mu)
+        s = RealNumber.create(self.n_qubits_slack, enc, a_min=0.0, a_max=1.0, weight_upper_bound=self.weight_upper_bound)
         # When an upper bound on the number of members is enforced, each slack unit must correspond to one member (step 1/M_max),
         # so M/M_max + S - 1 = 0 is exact for integer M. The n. of qubits for the slack variable should be enough to represent M_max.
         if self.volume_constraint['mode'] == 'num_add_members':
@@ -184,11 +184,11 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
                                 n_qubits_per_area, binary_representation_area,
                                 lower_lim_state=None, upper_lim_state=None,
                                 lower_lim_area=None, upper_lim_area=None,
-                                n_qubits_slack=3, mu=None):
+                                n_qubits_slack=3, weight_upper_bound=None):
         self.initialize_discretization()
-        self.generate_member_state_polys(n_qubits_per_var, binary_representation_state, lower_lim_state, upper_lim_state, mu)
-        self.generate_member_area_polys(n_qubits_per_area, binary_representation_area, lower_lim_area, upper_lim_area, mu)
-        self.mu = mu
+        self.generate_member_state_polys(n_qubits_per_var, binary_representation_state, lower_lim_state, upper_lim_state, weight_upper_bound)
+        self.generate_member_area_polys(n_qubits_per_area, binary_representation_area, lower_lim_area, upper_lim_area, weight_upper_bound)
+        self.weight_upper_bound = weight_upper_bound
         if self.volume_constraint['type'] == 'ineq':
             self.n_qubits_slack = n_qubits_slack
             self.generate_slack_variable()
@@ -261,7 +261,7 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
         if self.volume_constraint['type'] == 'ineq':
             self.generate_slack_variable()
 
-    def generate_member_area_polys(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None, mu=None):
+    def generate_member_area_polys(self, n_qubits_per_var, binary_representation, lower_lim=None, upper_lim=None, weight_upper_bound=None):
         assert(self.variable_generator is not None)
         if binary_representation in {'range_binary', 'adaptive_range_binary', 'range_bce', 'adaptive_range_bce', 'range_unary', 'adaptive_range_unary'}:
             assert(lower_lim is not None and upper_lim is not None), \
@@ -271,7 +271,7 @@ class TrussStructureOptimizationContinuous(TrussStructureOptimization):
         self.n_qubits_per_area = n_qubits_per_var
         self.binary_representation_area = binary_representation
         self.real_number_areas = RealNumber.create(self.n_qubits_per_area, self.binary_representation_area,
-                                                   a_min=lower_lim, a_max=upper_lim, a_min_lim=0.0, mu=mu)
+                                                   a_min=lower_lim, a_max=upper_lim, a_min_lim=0.0, weight_upper_bound=weight_upper_bound)
 
         member_area_polys = []
         member_areas = self.get_member_areas()
