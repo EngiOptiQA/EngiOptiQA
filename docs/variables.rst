@@ -30,10 +30,34 @@ Normalized Class
 .. autoclass:: Normalized
    :members:
 
-Range Class
------------
+Range Binary Class
+------------------
 
 .. currentmodule:: engioptiqa.variables.real_number
 
-.. autoclass:: Range
+.. autoclass:: RangeBinary
+   :members:
+
+Range Unary Class
+------------------
+
+.. currentmodule:: engioptiqa.variables.real_number
+
+.. autoclass:: RangeUnary
+   :members:
+
+Adaptive Range Binary Class
+---------------------------
+
+.. currentmodule:: engioptiqa.variables.real_number
+
+.. autoclass:: AdaptiveRangeBinary
+   :members:
+
+Adaptive Range Unary Class
+--------------------------
+
+.. currentmodule:: engioptiqa.variables.real_number
+
+.. autoclass:: AdaptiveRangeUnary
    :members:
